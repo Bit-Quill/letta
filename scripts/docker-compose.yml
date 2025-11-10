@@ -1,18 +1,18 @@
 version: '3.7'
 services:
   redis:
-    image: redis:alpine
-    container_name: redis
+    image: valkey/valkey:alpine
+    container_name: valkey
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli ping | grep PONG']
+      test: ['CMD-SHELL', 'valkey-cli ping | grep PONG']
       interval: 1s
       timeout: 3s
       retries: 5
     ports:
       - '6379:6379'
     volumes:
-      - ./data/redis:/data
-    command: redis-server --appendonly yes
+      - ./data/valkey:/data
+    command: valkey-server --appendonly yes
   postgres:
     image: ankane/pgvector
     container_name: postgres
