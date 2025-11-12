@@ -1,18 +1,20 @@
 version: '3.7'
 services:
   redis:
-    image: valkey/valkey:alpine
-    container_name: valkey
+    # Use environment variables to choose between redis (default) or valkey
+    # Usage: CACHE_IMAGE=valkey/valkey:alpine docker compose up
+    image: ${CACHE_IMAGE:-redis:alpine}
+    container_name: ${CACHE_CONTAINER_NAME:-redis}
     healthcheck:
-      test: ['CMD-SHELL', 'valkey-cli ping | grep PONG']
+      test: ${CACHE_HEALTHCHECK:-['CMD-SHELL', 'redis-cli ping | grep PONG']}
       interval: 1s
       timeout: 3s
       retries: 5
     ports:
       - '6379:6379'
     volumes:
-      - ./data/valkey:/data
-    command: valkey-server --appendonly yes
+      - ./data/${CACHE_DATA_DIR:-redis}:/data
+    command: ${CACHE_COMMAND:-redis-server --appendonly yes}
   postgres:
     image: ankane/pgvector
     container_name: postgres
