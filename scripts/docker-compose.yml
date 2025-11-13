@@ -1,18 +1,37 @@
+# Letta Infrastructure Services
+# Provides Redis/Valkey (cache) + PostgreSQL (database) for local development
+#
+# USAGE:
+#
+# Option 1: Redis (Default)
+#   docker compose -f scripts/docker-compose.yml up -d
+#
+# Option 2: Valkey (Alternative)
+#   CACHE_IMAGE=valkey/valkey:alpine \
+#   CACHE_CONTAINER_NAME=valkey \
+#   CACHE_HEALTHCHECK="['CMD-SHELL', 'valkey-cli ping | grep PONG']" \
+#   CACHE_COMMAND="valkey-server --appendonly yes" \
+#   CACHE_DATA_DIR=valkey \
+#   docker compose -f scripts/docker-compose.yml up -d
+#
+# Both Redis and Valkey are 100% protocol-compatible.
+# See scripts/README.md for more details.
+
 version: '3.7'
 services:
   redis:
-    image: redis:alpine
-    container_name: redis
+    image: ${CACHE_IMAGE:-redis:alpine}
+    container_name: ${CACHE_CONTAINER_NAME:-redis}
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli ping | grep PONG']
+      test: ${CACHE_HEALTHCHECK:-['CMD-SHELL', 'redis-cli ping | grep PONG']}
       interval: 1s
       timeout: 3s
       retries: 5
     ports:
       - '6379:6379'
     volumes:
-      - ./data/redis:/data
-    command: redis-server --appendonly yes
+      - ./data/${CACHE_DATA_DIR:-redis}:/data
+    command: ${CACHE_COMMAND:-redis-server --appendonly yes}
   postgres:
     image: ankane/pgvector
     container_name: postgres
