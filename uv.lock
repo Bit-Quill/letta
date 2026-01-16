@@ -1970,6 +1970,18 @@ wheels = [
 ]
 
 [[package]]
+name = "hypothesis"
+version = "6.150.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sortedcontainers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/19/a4eee0c98e2ec678854272f79646f34943f8fbbc42689cc355b530c5bc96/hypothesis-6.150.2.tar.gz", hash = "sha256:deb043c41c53eaf0955f4a08739c2a34c3d8040ee3d9a2da0aa5470122979f75", size = 475250, upload-time = "2026-01-13T17:09:22.146Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/5e/21caad4acf45db7caf730cca1bc61422283e4c4e841efbc862d17ab81a21/hypothesis-6.150.2-py3-none-any.whl", hash = "sha256:648d6a2be435889e713ba3d335b0fb5e7a250f569b56e6867887c1e7a0d1f02f", size = 542712, upload-time = "2026-01-13T17:09:19.945Z" },
+]
+
+[[package]]
 name = "identify"
 version = "2.6.13"
 source = { registry = "https://pypi.org/simple" }
@@ -2519,6 +2531,7 @@ dependencies = [
     { name = "anthropic" },
     { name = "apscheduler" },
     { name = "async-lru" },
+    { name = "asyncpg" },
     { name = "black", extra = ["jupyter"] },
     { name = "brotli" },
     { name = "certifi" },
@@ -2538,6 +2551,7 @@ dependencies = [
     { name = "html2text" },
     { name = "httpx" },
     { name = "httpx-sse" },
+    { name = "hypothesis" },
     { name = "letta-client" },
     { name = "llama-index" },
     { name = "llama-index-embeddings-openai" },
@@ -2561,12 +2575,14 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyhumps" },
+    { name = "pytest-asyncio" },
     { name = "python-box" },
     { name = "python-multipart" },
     { name = "pytz" },
     { name = "pyyaml" },
     { name = "questionary" },
     { name = "readability-lxml" },
+    { name = "redis" },
     { name = "rich" },
     { name = "ruff" },
     { name = "sentry-sdk", extra = ["fastapi"] },
@@ -2672,6 +2688,7 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.11.0" },
     { name = "async-lru", specifier = ">=2.0.5" },
     { name = "async-lru", marker = "extra == 'desktop'", specifier = ">=2.0.5" },
+    { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "asyncpg", marker = "extra == 'postgres'", specifier = ">=0.30.0" },
     { name = "black", extras = ["jupyter"], specifier = ">=24.2.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.36.24" },
@@ -2701,6 +2718,7 @@ requires-dist = [
     { name = "html2text", specifier = ">=2020.1.16" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "httpx-sse", specifier = ">=0.4.0" },
+    { name = "hypothesis", specifier = ">=6.150.2" },
     { name = "ipdb", marker = "extra == 'dev'", specifier = ">=0.13.13" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5" },
     { name = "langchain", marker = "extra == 'desktop'", specifier = ">=0.3.7" },
@@ -2743,6 +2761,7 @@ requires-dist = [
     { name = "pyhumps", specifier = ">=3.8.0" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.347" },
     { name = "pytest", marker = "extra == 'dev'" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "pytest-json-report", marker = "extra == 'dev'", specifier = ">=1.5.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14.0" },
@@ -2753,6 +2772,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "questionary", specifier = ">=2.0.1" },
     { name = "readability-lxml" },
+    { name = "redis", specifier = ">=6.4.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.2.0" },
     { name = "rich", specifier = ">=13.9.4" },
     { name = "ruff", extras = ["dev"], specifier = ">=0.12.10" },
@@ -5482,6 +5502,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/c4/ba2f8066cceb6f23394729afe52f3bf7adec04bf9ed2c820b39e19299111/sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88", size = 30594, upload-time = "2021-05-16T22:03:42.897Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0", size = 29575, upload-time = "2021-05-16T22:03:41.177Z" },
 ]
 
 [[package]]

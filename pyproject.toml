@@ -77,6 +77,10 @@ dependencies = [
     "clickhouse-connect>=0.10.0",
     "aiofiles>=24.1.0",
     "async-lru>=2.0.5",
+    "hypothesis>=6.150.2",
+    "pytest-asyncio>=1.1.0",
+    "asyncpg>=0.30.0",
+    "redis>=6.4.0",
 ]
 
 [project.scripts]

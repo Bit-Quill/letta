@@ -17,6 +17,10 @@ from letta.services.user_manager import UserManager
 from letta.settings import tool_settings
 
 
+def pytest_addoption(parser):
+    parser.addoption("--cache-backend", action="store", default="redis", dest="cache_backend", help="Cache backend to test: redis or valkey")
+
+
 def pytest_configure(config):
     logging.basicConfig(level=logging.DEBUG)
 

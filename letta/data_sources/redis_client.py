@@ -7,6 +7,8 @@ from letta.errors import ConversationBusyError
 from letta.log import get_logger
 from letta.settings import settings
 
+from .cache_backend import CacheBackend
+
 try:
     from redis import RedisError
     from redis.asyncio import ConnectionPool, Redis
@@ -22,7 +24,7 @@ logger = get_logger(__name__)
 _client_instance = None
 
 
-class AsyncRedisClient:
+class AsyncRedisClient(CacheBackend):
     """Async Redis client with connection pooling and error handling"""
 
     def __init__(
