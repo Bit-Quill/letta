@@ -18,7 +18,7 @@ from letta.settings import tool_settings
 
 
 def pytest_addoption(parser):
-    parser.addoption("--cache-backend", action="store", default="redis", dest="cache_backend", help="Cache backend to test: redis or valkey")
+    parser.addoption("--cache-backend", action="store", default="redis", dest="cache_backend", help="Cache backend to test: redis, valkey, or noop")
 
 
 def pytest_configure(config):
