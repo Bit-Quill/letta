@@ -3,7 +3,7 @@ Valkey backend implementation using the valkey-glide client.
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, Mapping
 
 from glide import (
     ExpirySet,
@@ -13,6 +13,8 @@ from glide import (
     NodeAddress,
     RequestError,
     ConditionalChange,
+    StreamTrimOptions,
+    StreamAddOptions,
     )
 
 from letta.data_sources.cache_backend import CacheBackend
@@ -36,10 +38,8 @@ class ValkeyBackend(CacheBackend):
         
 
     async def get_client(self) -> GlideClient:
-      logger.info(f"Checking for existing client:{self._client}" )
       if self._client is None:
           self._client = await GlideClient.create(self.client_config)
-          logger.info(f"Connected to Valkey at {self.host}:{self.port} with client:{self._client}" )
       return self._client
 
 
@@ -60,7 +60,6 @@ class ValkeyBackend(CacheBackend):
         try:
             client = await self.get_client()
             result = await client.ping()
-            logger.info(f"Valkey ping result: {result}")
             return result.decode("utf-8") == "PONG"
         except Exception as e:
             logger.error(f"Valkey ping failed: {e}")
@@ -102,9 +101,10 @@ class ValkeyBackend(CacheBackend):
 
         conditional_set = None
         if nx:
-            conditional_set = "NX"
+            conditional_set = ConditionalChange("NX")
         elif xx:
-            conditional_set = "XX"
+            conditional_set = ConditionalChange("XX")
+      
 
         expiry = None
         if ex is not None:
@@ -113,7 +113,7 @@ class ValkeyBackend(CacheBackend):
             expiry = ExpirySet(ExpiryType.MSEC, px)
 
         result = await client.set(
-            key, str(value), conditional_set=ConditionalChange(conditional_set), expiry=expiry
+            key, str(value), conditional_set=conditional_set, expiry=expiry
         )
 
         if (nx and result is None) or (xx and result is None):
@@ -137,7 +137,8 @@ class ValkeyBackend(CacheBackend):
 
     async def smembers(self, key: str) -> Set[str]:
         client = await self.get_client()
-        return await client.smembers(key)
+        result =await client.smembers(key) 
+        return {member.decode("utf-8") if isinstance(member, bytes) else member for member in result}
 
     async def smismember(self, key: str, values: Union[List[Any], Any]) -> Union[List[int], int]:
         client = await self.get_client()
@@ -172,12 +173,41 @@ class ValkeyBackend(CacheBackend):
         self, stream: str, fields: Dict[str, Any], id: str = "*", maxlen: Optional[int] = None, approximate: bool = True
     ) -> str:
         client = await self.get_client()
-        # glide-py xadd has a slightly different signature
-        return await client.xadd(stream, list(fields.items()))
+        field_items = list(fields.items())
 
+        trim_options = None
+        if maxlen is not None:
+            trim_options = StreamTrimOptions(exact=not approximate, threshold=maxlen, kind="MAXLEN")
+
+        # glide-py xadd has a slightly different signature
+        options = StreamAddOptions(id=id, trim=trim_options)
+        result = await client.xadd(stream, field_items, options=options)
+        return result.decode("utf-8") if isinstance(result, bytes) else result if result else ""
+    
+    def convert(mapping: Optional[Mapping[bytes, Mapping[bytes, List[List[bytes]]]]]) -> List[Dict]:
+        if not mapping:
+            return []
+        return [
+            {
+                outer_key.decode(): {
+                    inner_key.decode(): [
+                        [item.decode() for item in inner_list]
+                        for inner_list in value
+                    ]
+                    for inner_key, value in inner_mapping.items()
+                }
+            }
+            for outer_key, inner_mapping in mapping.items()
+        ]
+  
     async def xread(self, streams: Dict[str, str], count: Optional[int] = None, block: Optional[int] = None) -> List[Dict]:
         client = await self.get_client()
-        return await client.xread(streams, count=count, block=block)
+        options = StreamAddOptions(
+            block, count
+        )
+        result = await client.xread(streams)
+        logger.info(f"xread result: {result}")
+        return self.convert(result)
 
     async def xrange(self, stream: str, start: str = "-", end: str = "+", count: Optional[int] = None) -> List[Dict]:
         client = await self.get_client()

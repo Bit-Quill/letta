@@ -32,7 +32,6 @@ def cache_backend_type(request):
 @pytest_asyncio.fixture
 async def client(cache_backend_type):
     """Fixture for the cache client, parametrized by backend type."""
-    logging.info("Setting up cache client fixture for backend type: %s", cache_backend_type)
     if cache_backend_type == "redis":
         if not letta_settings.redis_host or not letta_settings.redis_port:
             pytest.skip("Redis not configured for tests. Set LETTA_REDIS_HOST and LETTA_REDIS_PORT.")
@@ -48,7 +47,6 @@ async def client(cache_backend_type):
             host=letta_settings.valkey_host,
             port=letta_settings.valkey_port,
         )
-        logging.info(f"Initialized ValkeyBackend client: {client}")
     elif cache_backend_type == "noop":
         client = NoopBackend()
     else:
@@ -730,6 +728,7 @@ async def test_xadd_operation(client_with_cleanup):
     # Add entry
     entry_id = await client_with_cleanup.xadd(stream, {"field1": "value1", "field2": "value2"})
     assert entry_id is not None
+    logging.info(f"Added entry ID: {entry_id}")
     assert "-" in entry_id  # Format: timestamp-sequence
 
 
