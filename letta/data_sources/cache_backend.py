@@ -203,6 +203,7 @@ async def get_cache_client() -> CacheBackend:
             _client_instance = await _create_valkey_backend()
         else:
             _client_instance = NoopBackend()
+        logging.info(f"Using cache backend: {backend_type or 'noop'}")
 
     return _client_instance
 

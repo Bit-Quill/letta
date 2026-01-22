@@ -7,7 +7,8 @@ from typing import Callable
 from pydantic import BaseModel
 
 from letta.constants import REDIS_DEFAULT_CACHE_PREFIX
-from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
+from letta.data_sources.cache_backend import get_redis_client
+from letta.data_sources import noop_client as NoopAsyncRedisClient
 from letta.log import get_logger
 from letta.otel.tracing import tracer
 from letta.plugins.plugins import get_experimental_checker

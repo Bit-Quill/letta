@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy import select
 
 from letta.constants import DEFAULT_ORG_ID
-from letta.data_sources.redis_client import get_redis_client
+from letta.data_sources.cache_backend import get_redis_client
 from letta.helpers.decorators import async_redis_cache
 from letta.log import get_logger
 from letta.orm.errors import NoResultFound

@@ -5,7 +5,7 @@ from typing import List, Literal, Optional
 
 from httpx import AsyncClient
 
-from letta.data_sources.redis_client import get_redis_client
+from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import LettaInvalidArgumentError
 from letta.helpers.datetime_helpers import get_utc_time
 from letta.log import get_logger

@@ -7,9 +7,10 @@ from starlette.responses import StreamingResponse
 
 from letta.agents.agent_loop import AgentLoop
 from letta.agents.letta_agent_v3 import LettaAgentV3
-from letta.constants import REDIS_RUN_ID_PREFIX
-from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
 from letta.errors import LettaExpiredError, LettaInvalidArgumentError, NoActiveRunsToCancelError
+from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.cache_backend import get_redis_client
+from letta.errors import LettaExpiredError, LettaInvalidArgumentError
 from letta.helpers.datetime_helpers import get_utc_time
 from letta.log import get_logger
 from letta.schemas.conversation import Conversation, CreateConversation, UpdateConversation
@@ -20,7 +21,6 @@ from letta.schemas.letta_request import ConversationMessageRequest, LettaStreami
 from letta.schemas.letta_response import LettaResponse, LettaStreamingResponse
 from letta.schemas.run import Run as PydanticRun
 from letta.server.rest_api.dependencies import HeaderParams, get_headers, get_letta_server
-from letta.server.rest_api.redis_stream_manager import redis_sse_stream_generator
 from letta.server.rest_api.streaming_response import (
     StreamingResponseWithStatusCode,
     add_keepalive_to_stream,
