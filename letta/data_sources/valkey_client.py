@@ -13,8 +13,10 @@ from glide import (
     NodeAddress,
     RequestError,
     ConditionalChange,
-    StreamTrimOptions,
+    StreamReadOptions,
     StreamAddOptions,
+    IdBound,
+    TrimByMaxLen,
     )
 
 from letta.data_sources.cache_backend import CacheBackend
@@ -174,48 +176,59 @@ class ValkeyBackend(CacheBackend):
     ) -> str:
         client = await self.get_client()
         field_items = list(fields.items())
-
-        trim_options = None
-        if maxlen is not None:
-            trim_options = StreamTrimOptions(exact=not approximate, threshold=maxlen, kind="MAXLEN")
+        trim_options = TrimByMaxLen(exact=not approximate, threshold=maxlen) if maxlen is not None else None
 
         # glide-py xadd has a slightly different signature
         options = StreamAddOptions(id=id, trim=trim_options)
         result = await client.xadd(stream, field_items, options=options)
         return result.decode("utf-8") if isinstance(result, bytes) else result if result else ""
     
-    def convert(mapping: Optional[Mapping[bytes, Mapping[bytes, List[List[bytes]]]]]) -> List[Dict]:
-        if not mapping:
-            return []
-        return [
-            {
-                outer_key.decode(): {
-                    inner_key.decode(): [
-                        [item.decode() for item in inner_list]
-                        for inner_list in value
-                    ]
-                    for inner_key, value in inner_mapping.items()
-                }
-            }
-            for outer_key, inner_mapping in mapping.items()
-        ]
+    def xread_convert(self, mapping: Optional[Mapping[bytes, Mapping[bytes, List[List[bytes]]]]]) -> List[List]:
+      if not mapping:
+          return []
+      
+      result = []
+      for stream_name, entries in mapping.items():
+          converted_entries = []
+          for entry_id, field_pairs in entries.items():
+              # field_pairs is [[b'0', b''], [b'1', b'']]
+              # Convert to {'0': '', '1': ''}
+              fields_dict = {pair[0].decode(): pair[1].decode() for pair in field_pairs}
+              converted_entries.append((entry_id.decode(), fields_dict))
+          result.append([stream_name.decode(), converted_entries])
+      
+      return result
   
     async def xread(self, streams: Dict[str, str], count: Optional[int] = None, block: Optional[int] = None) -> List[Dict]:
         client = await self.get_client()
-        options = StreamAddOptions(
-            block, count
+        options = StreamReadOptions(
+            block_ms=block, count=count
         )
-        result = await client.xread(streams)
-        logger.info(f"xread result: {result}")
-        return self.convert(result)
+        result = await client.xread(streams, options=options)
+        converted = self.xread_convert(result)
+        return converted
+        
+    def range_convert(self, mapping: Optional[Mapping[bytes, List[List[bytes]]]]) -> List[Dict]:
+      if not mapping:
+          return []
+      result = []
+      for k, v in mapping.items():
+          fields = v[0]  # [b'index', b'2']
+          fields_dict = {fields[i].decode(): fields[i+1].decode() for i in range(0, len(fields), 2)}
+          result.append((k.decode(), fields_dict))
+      return result
 
     async def xrange(self, stream: str, start: str = "-", end: str = "+", count: Optional[int] = None) -> List[Dict]:
         client = await self.get_client()
-        return await client.xrange(stream, start, end, count=count)
+        result = await client.xrange(stream, IdBound(start), IdBound(end ), count=count)
+        converted =  self.range_convert(result)
+        return converted
 
     async def xrevrange(self, stream: str, start: str = "+", end: str = "-", count: Optional[int] = None) -> List[Dict]:
         client = await self.get_client()
-        return await client.xrevrange(stream, start, end, count=count)
+        result =  await client.xrevrange(stream, IdBound(start), IdBound(end), count=count)
+        converted = self.range_convert(result)
+        return converted
 
     async def xlen(self, stream: str) -> int:
         client = await self.get_client()
@@ -227,13 +240,12 @@ class ValkeyBackend(CacheBackend):
 
     async def xinfo_stream(self, stream: str) -> Dict:
         client = await self.get_client()
-        # glide-py does not have a direct xinfo_stream, this would need a custom command
-        # Returning empty dict as a placeholder
-        return {}
+        result = await client.xinfo_stream(stream)
+        return result
 
     async def xtrim(self, stream: str, maxlen: int, approximate: bool = True) -> int:
         client = await self.get_client()
-        return await client.xtrim(stream, "MAXLEN", maxlen, approximate=approximate)
+        return await client.xtrim(stream, TrimByMaxLen(exact=not approximate, threshold=maxlen))
 
     async def acquire_conversation_lock(self, conversation_id: str, token: str) -> Optional[Any]:
         # This is a complex operation that might need a more direct implementation
@@ -259,25 +271,34 @@ class ValkeyBackend(CacheBackend):
         return True
 
     async def check_inclusion_and_exclusion(self, member: str, group: str) -> bool:
-        client = await self.get_client()
-        # This requires a transaction or Lua script for atomicity
-        # Simplified version:
-        is_excluded = await client.smismember(f"{group}:exclude", member)
-        if is_excluded:
-            return False
-        has_includes = await client.exists([f"{group}:include"])
-        if not has_includes:
-            return True
-        is_included = await client.smismember(f"{group}:include", member)
-        return bool(is_included)
+      client = await self.get_client()
+      exclude_key = f"{group}:exclude"
+      include_key = f"{group}:include"
+      
+      # Check if keys exist first
+      exclude_exists = await client.exists([exclude_key])
+      include_exists = await client.exists([include_key])
+      
+      # If exclude set exists and has member, return False
+      if exclude_exists:
+          is_excluded = await client.smismember(exclude_key, [member])
+          if is_excluded and is_excluded[0]:  # Check the actual value
+              return False
+    
+      # If no include set exists, default allow
+      if not include_exists:
+          return True
+      
+      # If include set exists, check membership
+      is_included = await client.smismember(include_key, [member])
+      return bool(is_included and is_included[0])  # Check the actual value
 
     async def create_inclusion_exclusion_keys(self, group: str) -> None:
         client = await self.get_client()
         # This is a no-op if the keys already exist, which is fine.
-        await client.sadd(f"{group}:include", "placeholder-for-creation")
-        await client.srem(f"{group}:include", "placeholder-for-creation")
-        await client.sadd(f"{group}:exclude", "placeholder-for-creation")
-        await client.srem(f"{group}:exclude", "placeholder-for-creation")
+        await client.sadd(f"{group}:include", ["placeholder-for-creation"])
+        await client.sadd(f"{group}:exclude", ["placeholder-for-creation"])
+        
 
     async def ttl(self, key: str) -> int:
         client = await self.get_client()

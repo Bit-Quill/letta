@@ -251,7 +251,6 @@ async def test_set_nx_option(client_with_cleanup):
 
     # Second set with nx should fail
     result2 = await client_with_cleanup.set(key, "value2", nx=True)
-    logging.info(f"result2: {result2}")
     assert result2 is None or result2 is False
 
     # Value should still be the first one
@@ -727,8 +726,6 @@ async def test_xadd_operation(client_with_cleanup):
 
     # Add entry
     entry_id = await client_with_cleanup.xadd(stream, {"field1": "value1", "field2": "value2"})
-    assert entry_id is not None
-    logging.info(f"Added entry ID: {entry_id}")
     assert "-" in entry_id  # Format: timestamp-sequence
 
 
@@ -1222,7 +1219,7 @@ async def test_context_manager_enter_exit():
 @pytest.mark.asyncio
 @given(key=redis_key_strategy, value=redis_value_strategy)
 @hypothesis_settings
-@pytest.mark.skip(reason="Tests internal _client state which varies by backend")
+#@pytest.mark.skip(reason="Tests internal _client state which varies by backend")
 async def test_property_context_manager_cleanup(cache_backend_type, key, value):
     """
     Feature: valkey-support, Property 14: Context Manager Cleanup
@@ -1329,7 +1326,7 @@ async def test_exponential_backoff():
 @pytest.mark.asyncio
 @given(key=redis_key_strategy, value=redis_value_strategy)
 @hypothesis_settings
-@pytest.mark.skip(reason="Tests retry logic with Valkey backend which may not be configured")
+#@pytest.mark.skip(reason="Tests retry logic with Valkey backend which may not be configured")
 async def test_property_retry_eventually_succeeds_or_fails(cache_backend_type, key, value):
     """
     Feature: valkey-support, Property 13: Retry Eventually Succeeds or Fails
@@ -1366,7 +1363,6 @@ async def test_property_retry_eventually_succeeds_or_fails(cache_backend_type, k
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="NoopBackend now stores data like Redis, not a true no-op")
 async def test_noop_set_returns_false(noop_client):
     """Test that Noop set returns False."""
     result = await noop_client.set("key", "value")
@@ -1398,7 +1394,6 @@ async def test_noop_delete_returns_zero(noop_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="NoopBackend now stores data like Redis, not a true no-op")
 async def test_noop_sadd_returns_zero(noop_client):
     """Test that Noop sadd returns 0."""
     result = await noop_client.sadd("set", "member1", "member2")
@@ -1437,7 +1432,6 @@ async def test_noop_scard_returns_zero(noop_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="NoopBackend now stores data like Redis, not a true no-op")
 async def test_noop_stream_operations_return_safe_defaults(noop_client):
     """Test that Noop stream operations return safe defaults."""
     assert await noop_client.xadd("stream", {"field": "value"}) == ""
@@ -1451,7 +1445,6 @@ async def test_noop_stream_operations_return_safe_defaults(noop_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="NoopBackend now stores data like Redis, not a true no-op")
 async def test_noop_lock_operations_return_safe_defaults(noop_client):
     """Test that Noop lock operations return safe defaults."""
     lock = await noop_client.acquire_conversation_lock("conv_id", "token")
@@ -1516,7 +1509,6 @@ async def test_noop_no_external_dependencies():
     value=redis_value_strategy,
 )
 @hypothesis_settings
-@pytest.mark.skip(reason="NoopBackend now stores data like Redis, not returning safe defaults")
 async def test_property_noop_returns_safe_defaults(noop_client, operation, key, value):
     """
     Feature: valkey-support, Property 10: Noop Returns Safe Defaults
