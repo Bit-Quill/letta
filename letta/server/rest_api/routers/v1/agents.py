@@ -18,7 +18,7 @@ from letta.agents.letta_agent import LettaAgent
 from letta.agents.letta_agent_v2 import LettaAgentV2
 from letta.agents.letta_agent_v3 import LettaAgentV3
 from letta.constants import DEFAULT_MAX_STEPS, DEFAULT_MESSAGE_TOOL, DEFAULT_MESSAGE_TOOL_KWARG, REDIS_RUN_ID_PREFIX
-from letta.data_sources.redis_client import get_redis_client
+from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import (
     AgentExportIdMappingError,
     AgentExportProcessingError,

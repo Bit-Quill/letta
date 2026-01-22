@@ -10,7 +10,8 @@ from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
 from letta.agents.agent_loop import AgentLoop
 from letta.agents.base_agent_v2 import BaseAgentV2
 from letta.constants import REDIS_RUN_ID_PREFIX
-from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
+from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import (
     LettaInvalidArgumentError,
     LettaServiceUnavailableError,

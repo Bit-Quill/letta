@@ -38,7 +38,8 @@ from letta.constants import (
     MCP_TOOL_TAG_NAME_PREFIX,
     MULTI_AGENT_TOOLS,
 )
-from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
+from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.cache_backend import get_redis_client
 from letta.functions.functions import derive_openai_json_schema, parse_source_code
 from letta.functions.mcp_client.types import MCPTool
 from letta.helpers import ToolRulesSolver

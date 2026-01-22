@@ -1,6 +1,7 @@
 import pytest
 
-from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
+from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.cache_backend import get_redis_client
 from letta.helpers.decorators import experimental
 from letta.settings import settings
 

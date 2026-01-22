@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
 from typing import Dict, List, Optional
 
-from letta.data_sources.redis_client import AsyncRedisClient
+from letta.data_sources.cache_backend import CacheBackend
 from letta.log import get_logger
 from letta.schemas.enums import RunStatus
 from letta.schemas.letta_message import LettaErrorMessage
@@ -35,7 +35,7 @@ class RedisSSEStreamWriter:
 
     def __init__(
         self,
-        redis_client: AsyncRedisClient,
+        redis_client: CacheBackend,
         flush_interval: float = 0.5,
         flush_size: int = 50,
         stream_ttl_seconds: int = 10800,  # 3 hours default
@@ -45,7 +45,7 @@ class RedisSSEStreamWriter:
         Initialize the Redis SSE stream writer.
 
         Args:
-            redis_client: Redis client instance
+            redis_client: Cache client instance
             flush_interval: Seconds between automatic flushes
             flush_size: Number of chunks to buffer before flushing
             stream_ttl_seconds: TTL for streams in seconds (default: 6 hours)
