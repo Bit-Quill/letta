@@ -27,30 +27,50 @@ from letta.settings import settings as letta_settings
 # ============================================================================
 @pytest.fixture(scope="session")
 def cache_backend_type(request):
-    return request.config.getoption("cache_backend")
+    backend = request.config.getoption("cache_backend")
+    # Default to redis if not specified for backward compatibility
+    return backend if backend else "redis"
+
+
+def create_cache_client(cache_backend_type, host=None, port=None):
+    """
+    Helper function to create a cache client based on backend type.
+    Defaults to Redis if backend type is not set or is "redis".
+    
+    Args:
+        cache_backend_type: Type of backend ("redis", "valkey", or "noop")
+        host: Optional custom host (uses settings if not provided)
+        port: Optional custom port (uses settings if not provided)
+    """
+    # Default to redis for backward compatibility
+    if cache_backend_type == "valkey":
+        valkey_host = host or letta_settings.valkey_host
+        valkey_port = port or letta_settings.valkey_port
+        if not valkey_host or not valkey_port:
+            pytest.skip("Valkey not configured for tests. Set LETTA_VALKEY_HOST and LETTA_VALKEY_PORT.")
+        return ValkeyBackend(
+            host=valkey_host,
+            port=valkey_port,
+        )
+    else:  # Default to redis
+        redis_host = host or letta_settings.redis_host
+        redis_port = port or letta_settings.redis_port
+        if not redis_host or not redis_port:
+            pytest.skip("Redis not configured for tests. Set LETTA_REDIS_HOST and LETTA_REDIS_PORT.")
+        return RedisBackend(
+            host=redis_host,
+            port=redis_port,
+            db=0,
+        )
+
 
 @pytest_asyncio.fixture
 async def client(cache_backend_type):
     """Fixture for the cache client, parametrized by backend type."""
-    if cache_backend_type == "redis":
-        if not letta_settings.redis_host or not letta_settings.redis_port:
-            pytest.skip("Redis not configured for tests. Set LETTA_REDIS_HOST and LETTA_REDIS_PORT.")
-        client = RedisBackend(
-            host=letta_settings.redis_host,
-            port=letta_settings.redis_port,
-            db=0,
-        )
-    elif cache_backend_type == "valkey":
-        if not letta_settings.valkey_host or not letta_settings.valkey_port:
-            pytest.skip("Valkey not configured for tests. Set LETTA_VALKEY_HOST and LETTA_VALKEY_PORT.")
-        client = ValkeyBackend(
-            host=letta_settings.valkey_host,
-            port=letta_settings.valkey_port,
-        )
-    elif cache_backend_type == "noop":
+    if cache_backend_type == "noop":
         client = NoopBackend()
     else:
-        pytest.fail(f"Unknown cache backend: {cache_backend_type}")
+        client = create_cache_client(cache_backend_type)
 
     try:
         await client.wait_for_ready(timeout=5)
@@ -1143,13 +1163,11 @@ async def test_wait_for_ready_with_available_server(client):
 @pytest.mark.asyncio
 async def test_wait_for_ready_timeout(cache_backend_type):
     """Test wait_for_ready times out with unavailable server."""
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't have connection timeouts")
+    
     # Create client with invalid host
-    if cache_backend_type == "redis":
-        client = RedisBackend(host="invalid_host_12345", port=9999)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host="invalid_host_12345", port=9999)
-    else:
-        pytest.skip("Unknown cache backend type")
+    client = create_cache_client(cache_backend_type, host="invalid_host_12345", port=9999)
     # Should raise ConnectionError after timeout
     with pytest.raises(ConnectionError) as exc_info:
         await client.wait_for_ready(timeout=1, interval=0.1)
@@ -1167,13 +1185,10 @@ async def test_wait_for_ready_timeout(cache_backend_type):
 @pytest.mark.asyncio
 async def test_get_client_creates_client(cache_backend_type):
     """Test that get_client creates and returns a client."""
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't need client creation test")
 
-    if cache_backend_type == "redis":
-        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-    else:
-        pytest.skip("Unknown cache backend type")
+    client = create_cache_client(cache_backend_type)
 
     redis_instance = await client.get_client()
     assert redis_instance is not None
@@ -1188,15 +1203,10 @@ async def test_get_client_creates_client(cache_backend_type):
 @pytest.mark.asyncio
 async def test_close_cleans_up_resources(cache_backend_type):
     """Test that close properly cleans up resources."""
-    if letta_settings.redis_host is None:
-        pytest.skip("Redis not configured")
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't need cleanup test")
 
-    if cache_backend_type == "redis":
-        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-    else:
-        pytest.skip("Unknown cache backend type")
+    client = create_cache_client(cache_backend_type)
 
     await client.get_client()
     await client.close()
@@ -1211,12 +1221,10 @@ async def test_context_manager_enter_exit(cache_backend_type):
     if letta_settings.redis_host is None:
         pytest.skip("Redis not configured")
 
-    if cache_backend_type == "redis":
-        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-    else:
-        pytest.skip("Unknown cache backend type")
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't support context manager test")
+
+    client = create_cache_client(cache_backend_type)
 
     async with client as ctx_client:
         assert ctx_client is client
@@ -1250,14 +1258,9 @@ async def test_property_context_manager_cleanup(cache_backend_type, key, value):
     test_key = f"test:prop:ctx:{key}"
 
     # Test normal exit
-    if cache_backend_type == "redis":
-        client1 = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-        client2 = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-        cleanup_client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    else: # valkey
-        client1 = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-        client2 = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-        cleanup_client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    client1 = create_cache_client(cache_backend_type)
+    client2 = create_cache_client(cache_backend_type)
+    cleanup_client = create_cache_client(cache_backend_type)
 
     async with client1:
         await client1.set(test_key, value)
@@ -1289,13 +1292,10 @@ async def test_retry_on_transient_failures(cache_backend_type):
     """Test that operations retry on transient failures."""
     # This test would require mocking Redis to simulate transient failures
     # For now, we'll test that the retry decorator exists and is applied
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't have retry logic")
 
-    if cache_backend_type == "redis":
-        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-    else:
-        pytest.skip("Unknown cache backend type")
+    client = create_cache_client(cache_backend_type)
 
     # Verify that methods have retry decorator
     # The with_retry decorator wraps the function
@@ -1307,13 +1307,11 @@ async def test_retry_on_transient_failures(cache_backend_type):
 @pytest.mark.asyncio
 async def test_max_retries_exceeded(cache_backend_type):
     """Test that operations fail after max retries."""
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't have connection failures")
+    
     # Create client with invalid host to force connection errors
-    if cache_backend_type == "redis":
-        client = RedisBackend(host="invalid_host_99999", port=9999)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host="invalid_host_99999", port=9999)
-    else:
-        pytest.skip("Unknown cache backend type")
+    client = create_cache_client(cache_backend_type, host="invalid_host_99999", port=9999)
 
     # Operations should eventually fail
     try:
@@ -1333,13 +1331,10 @@ async def test_exponential_backoff(cache_backend_type):
     """Test that retry logic uses exponential backoff."""
     # This is more of a behavioral test - we verify the decorator exists
     # Actual backoff timing would require mocking time.sleep
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't have retry logic")
 
-    if cache_backend_type == "redis":
-        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    elif cache_backend_type == "valkey":
-        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
-    else:
-        pytest.skip("Unknown cache backend type")
+    client = create_cache_client(cache_backend_type)
 
     # The with_retry decorator should be present on methods
     # It implements exponential backoff: delay * (2 ** attempt)
@@ -1364,19 +1359,16 @@ async def test_property_retry_eventually_succeeds_or_fails(cache_backend_type, k
     the operation should either eventually succeed or raise a final error after max retries.
     Validates: Requirements 1.8
     """
-    if letta_settings.redis_host is None:
-        pytest.skip("Redis not configured")
+    if cache_backend_type == "noop":
+        pytest.skip("Noop backend doesn't have retry logic")
 
     test_key = f"test:prop:retry:{key}"
 
-    # With a working Redis instance, operations should succeed
-    if cache_backend_type == "redis":
-        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
-    else: # valkey
-        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    # With a working backend instance, operations should succeed
+    client = create_cache_client(cache_backend_type)
 
     try:
-        # This should succeed (no transient failures with working Redis)
+        # This should succeed (no transient failures with working backend)
         result = await client.set(test_key, value)
         assert result is True or result is not None
 
