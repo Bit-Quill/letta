@@ -39,9 +39,7 @@ class ValkeyBackend(CacheBackend):
             
         self.host = str(host)  # Ensure it's a string
         self.port = int(port)  # Ensure it's an int
-        
-        logger.info(f"Initializing Valkey backend with host={self.host}, port={self.port}")
-        
+               
         self.client_config = GlideClientConfiguration(
             addresses=[NodeAddress(host=self.host, port=self.port)],
             # Other config options can be added here
@@ -74,7 +72,7 @@ class ValkeyBackend(CacheBackend):
             result = await client.ping()
             return result.decode("utf-8") == "PONG"
         except Exception as e:
-            logger.error(f"Valkey ping failed: {e}")
+            logger.debug(f"Valkey ping failed: {e}")
             return False
 
     async def wait_for_ready(self, timeout: int = 30, interval: float = 0.5) -> None:

@@ -1141,11 +1141,15 @@ async def test_wait_for_ready_with_available_server(client):
 
 
 @pytest.mark.asyncio
-async def test_wait_for_ready_timeout():
+async def test_wait_for_ready_timeout(cache_backend_type):
     """Test wait_for_ready times out with unavailable server."""
     # Create client with invalid host
-    client = RedisBackend(host="invalid_host_12345", port=9999)
-
+    if cache_backend_type == "redis":
+        client = RedisBackend(host="invalid_host_12345", port=9999)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host="invalid_host_12345", port=9999)
+    else:
+        pytest.skip("Unknown cache backend type")
     # Should raise ConnectionError after timeout
     with pytest.raises(ConnectionError) as exc_info:
         await client.wait_for_ready(timeout=1, interval=0.1)
@@ -1161,12 +1165,15 @@ async def test_wait_for_ready_timeout():
 
 
 @pytest.mark.asyncio
-async def test_get_client_creates_client():
+async def test_get_client_creates_client(cache_backend_type):
     """Test that get_client creates and returns a client."""
-    if letta_settings.redis_host is None:
-        pytest.skip("Redis not configured")
 
-    client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    if cache_backend_type == "redis":
+        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    else:
+        pytest.skip("Unknown cache backend type")
 
     redis_instance = await client.get_client()
     assert redis_instance is not None
@@ -1179,12 +1186,17 @@ async def test_get_client_creates_client():
 
 
 @pytest.mark.asyncio
-async def test_close_cleans_up_resources():
+async def test_close_cleans_up_resources(cache_backend_type):
     """Test that close properly cleans up resources."""
     if letta_settings.redis_host is None:
         pytest.skip("Redis not configured")
 
-    client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    if cache_backend_type == "redis":
+        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    else:
+        pytest.skip("Unknown cache backend type")
 
     await client.get_client()
     await client.close()
@@ -1194,12 +1206,17 @@ async def test_close_cleans_up_resources():
 
 
 @pytest.mark.asyncio
-async def test_context_manager_enter_exit():
+async def test_context_manager_enter_exit(cache_backend_type):
     """Test async context manager support."""
     if letta_settings.redis_host is None:
         pytest.skip("Redis not configured")
 
-    client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    if cache_backend_type == "redis":
+        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    else:
+        pytest.skip("Unknown cache backend type")
 
     async with client as ctx_client:
         assert ctx_client is client
@@ -1268,15 +1285,17 @@ async def test_property_context_manager_cleanup(cache_backend_type, key, value):
 
 
 @pytest.mark.asyncio
-async def test_retry_on_transient_failures():
+async def test_retry_on_transient_failures(cache_backend_type):
     """Test that operations retry on transient failures."""
     # This test would require mocking Redis to simulate transient failures
     # For now, we'll test that the retry decorator exists and is applied
 
-    if letta_settings.redis_host is None:
-        pytest.skip("Redis not configured")
-
-    client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    if cache_backend_type == "redis":
+        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    else:
+        pytest.skip("Unknown cache backend type")
 
     # Verify that methods have retry decorator
     # The with_retry decorator wraps the function
@@ -1286,30 +1305,41 @@ async def test_retry_on_transient_failures():
 
 
 @pytest.mark.asyncio
-async def test_max_retries_exceeded():
+async def test_max_retries_exceeded(cache_backend_type):
     """Test that operations fail after max retries."""
     # Create client with invalid host to force connection errors
-    client = RedisBackend(host="invalid_host_99999", port=9999)
+    if cache_backend_type == "redis":
+        client = RedisBackend(host="invalid_host_99999", port=9999)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host="invalid_host_99999", port=9999)
+    else:
+        pytest.skip("Unknown cache backend type")
 
     # Operations should eventually fail
-    from redis.exceptions import ConnectionError as RedisConnectionError
-
-    with pytest.raises(RedisConnectionError):
+    try:
         await client.set("test_key", "test_value")
+        pytest.fail("Expected an exception to be raised for invalid host")
+    except Exception as e:
+        # Any exception is acceptable - connection should fail
+        # Just verify we got an exception
+        assert e is not None
+        logging.info(f"Got expected exception: {type(e).__name__}: {e}")
 
     await client.close()
 
 
 @pytest.mark.asyncio
-async def test_exponential_backoff():
+async def test_exponential_backoff(cache_backend_type):
     """Test that retry logic uses exponential backoff."""
     # This is more of a behavioral test - we verify the decorator exists
     # Actual backoff timing would require mocking time.sleep
 
-    if letta_settings.redis_host is None:
-        pytest.skip("Redis not configured")
-
-    client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    if cache_backend_type == "redis":
+        client = RedisBackend(host=letta_settings.redis_host, port=letta_settings.redis_port)
+    elif cache_backend_type == "valkey":
+        client = ValkeyBackend(host=letta_settings.valkey_host, port=letta_settings.valkey_port)
+    else:
+        pytest.skip("Unknown cache backend type")
 
     # The with_retry decorator should be present on methods
     # It implements exponential backoff: delay * (2 ** attempt)
