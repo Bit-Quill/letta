@@ -30,10 +30,20 @@ class ValkeyBackend(CacheBackend):
     """Valkey backend implementation."""
 
     def __init__(self, host: str, port: int, **kwargs):
-        self.host = host
-        self.port = port
+        if not host:
+            raise ValueError("Valkey host must be specified")
+        if not isinstance(host, str):
+            raise ValueError(f"Valkey host must be a string, got {type(host)}")
+        if not isinstance(port, int):
+            raise ValueError(f"Valkey port must be an integer, got {type(port)}")
+            
+        self.host = str(host)  # Ensure it's a string
+        self.port = int(port)  # Ensure it's an int
+        
+        logger.info(f"Initializing Valkey backend with host={self.host}, port={self.port}")
+        
         self.client_config = GlideClientConfiguration(
-            addresses=[NodeAddress(host=host, port=port)],
+            addresses=[NodeAddress(host=self.host, port=self.port)],
             # Other config options can be added here
         )
         self._client: Optional[GlideClient] = None

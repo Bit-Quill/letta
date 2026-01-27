@@ -181,13 +181,54 @@ class CacheBackend(ABC):
     async def create_inclusion_exclusion_keys(self, group: str) -> None:
         """Create inclusion/exclusion keys for group."""
         pass
+
+
+# Global singleton instance
+_client_instance = None
+
+
+async def _create_redis_backend():
+    """Create Redis backend instance."""
+    try:
+        from letta.data_sources.redis_client import AsyncRedisClient
+        from letta.settings import settings
+
+        return AsyncRedisClient(
+            host=settings.redis_host,
+            port=settings.redis_port,
+        )
+    except ImportError:
+        import logging
+        from letta.data_sources.noop_client import NoopAsyncCacheClient
+
+        logging.warning("Redis package not installed, falling back to noop cache backend")
+        return NoopAsyncCacheClient()
+
+
+async def _create_valkey_backend():
+    """Create Valkey backend instance."""
+    import logging
+    from letta.data_sources.valkey_client import ValkeyBackend as AsyncValkeyClient
+    from letta.settings import settings
+
+    logging.info(f"Creating Valkey backend with host={settings.valkey_host!r} (type={type(settings.valkey_host)}), port={settings.valkey_port!r} (type={type(settings.valkey_port)})")
     
+    return AsyncValkeyClient(
+        host=settings.valkey_host,
+        port=settings.valkey_port,
+    )
+
+
 async def get_cache_client() -> CacheBackend:
     """
     Factory function to get appropriate cache backend.
 
     Returns singleton instance based on configuration.
     """
+    import logging
+    from letta.data_sources.noop_client import NoopBackend as NoopAsyncCacheClient
+    from letta.settings import settings
+
     global _client_instance
 
     if _client_instance is None:
@@ -202,10 +243,11 @@ async def get_cache_client() -> CacheBackend:
         elif backend_type == "valkey":
             _client_instance = await _create_valkey_backend()
         else:
-            _client_instance = NoopBackend()
+            _client_instance = NoopAsyncCacheClient()
         logging.info(f"Using cache backend: {backend_type or 'noop'}")
 
     return _client_instance
+
 
 # Backward compatibility alias
 async def get_redis_client() -> CacheBackend:

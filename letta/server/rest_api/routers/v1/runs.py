@@ -4,7 +4,7 @@ from typing import Annotated, Any, List, Literal, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import Field
 
-from letta.data_sources import noop_clißent as NoopAsyncRedisClient
+from letta.data_sources import noop_client as NoopAsyncRedisClient
 from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import LettaExpiredError, LettaInvalidArgumentError
 from letta.helpers.datetime_helpers import get_utc_time
@@ -17,7 +17,7 @@ from letta.schemas.run import Run
 from letta.schemas.run_metrics import RunMetrics
 from letta.schemas.step import Step
 from letta.server.rest_api.dependencies import HeaderParams, get_headers, get_letta_server
-from letta.server.rest_api.redis_stream_manager import redis_sse_stream_generator
+from letta.server.rest_api.stream_manager import sse_stream_generator
 from letta.server.rest_api.streaming_response import (
     StreamingResponseWithStatusCode,
     add_keepalive_to_stream,
@@ -385,8 +385,8 @@ async def retrieve_stream_for_run(
             ),
         )
 
-    stream = redis_sse_stream_generator(
-        redis_client=redis_client,
+    stream = sse_stream_generator(
+        cache_client=redis_client,
         run_id=run_id,
         starting_after=request.starting_after,
         poll_interval=request.poll_interval,

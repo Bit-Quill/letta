@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
+      target: runtime
       args:
         - MEMGPT_ENVIRONMENT=DEVELOPMENT
     depends_on:
@@ -18,7 +18,7 @@ services:
     volumes:
       - ./letta:/letta
       - ~/.letta/credentials:/root/.letta/credentials
-      - ./configs/server_config.yaml:/root/.letta/config
+      - ./configs/server_config.yaml:/root/.letta/configs      
       - ./CONTRIBUTING.md:/CONTRIBUTING.md
       - ./tests/pytest_cache:/letta/.pytest_cache
       - ./tests/pytest.ini:/letta/pytest.ini

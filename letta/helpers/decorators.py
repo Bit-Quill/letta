@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from letta.constants import REDIS_DEFAULT_CACHE_PREFIX
 from letta.data_sources.cache_backend import get_redis_client
-from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.noop_client import NoopBackend as NoopAsyncCacheClient
 from letta.log import get_logger
 from letta.otel.tracing import tracer
 from letta.plugins.plugins import get_experimental_checker
@@ -117,7 +117,7 @@ def async_redis_cache(
                     redis_client = await get_redis_client()
 
                 # Don't bother going through other operations for no reason.
-                if isinstance(redis_client, NoopAsyncRedisClient):
+                if isinstance(redis_client, NoopAsyncCacheClient):
                     span.set_attribute("cache.noop", True)
                     return await func(*args, **kwargs)
 
