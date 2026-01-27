@@ -20,11 +20,16 @@ wait_for_redis() {
     done
 }
 
-# Check if we're configured for external Redis
-if [ -n "$LETTA_REDIS_HOST" ]; then
+# Check if we're configured for external cache backend (Redis or Valkey)
+if [ -n "$LETTA_VALKEY_HOST" ] || [ "$LETTA_CACHE_BACKEND_TYPE" = "valkey" ]; then
+    echo "Valkey configuration detected, skipping internal Redis startup"
+    if [ -n "$LETTA_VALKEY_HOST" ]; then
+        echo "Using external Valkey at: $LETTA_VALKEY_HOST"
+    fi
+elif [ -n "$LETTA_REDIS_HOST" ]; then
     echo "External Redis configuration detected, using env var LETTA_REDIS_HOST=$LETTA_REDIS_HOST"
 else
-    echo "No external Redis configuration detected, starting internal Redis..."
+    echo "No external cache backend configuration detected, starting internal Redis..."
     redis-server --daemonize yes --bind 0.0.0.0
 
     # Wait for Redis to be ready

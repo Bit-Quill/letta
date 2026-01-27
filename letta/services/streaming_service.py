@@ -37,7 +37,7 @@ from letta.schemas.message import MessageCreate
 from letta.schemas.run import Run as PydanticRun, RunUpdate
 from letta.schemas.usage import LettaUsageStatistics
 from letta.schemas.user import User
-from letta.server.rest_api.redis_stream_manager import create_background_stream_processor, redis_sse_stream_generator
+from letta.server.rest_api.stream_manager import create_background_stream_processor, sse_stream_generator
 from letta.server.rest_api.streaming_response import (
     RunCancelledException,
     StreamingResponseWithStatusCode,
@@ -186,8 +186,8 @@ class StreamingService:
                         label=f"background_stream_processor_{run.id}",
                     )
 
-                    raw_stream = redis_sse_stream_generator(
-                        redis_client=redis_client,
+                    raw_stream = sse_stream_generator(
+                        cache_client=redis_client,
                         run_id=run.id,
                     )
 

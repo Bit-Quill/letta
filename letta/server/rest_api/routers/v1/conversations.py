@@ -21,6 +21,7 @@ from letta.schemas.letta_request import ConversationMessageRequest, LettaStreami
 from letta.schemas.letta_response import LettaResponse, LettaStreamingResponse
 from letta.schemas.run import Run as PydanticRun
 from letta.server.rest_api.dependencies import HeaderParams, get_headers, get_letta_server
+from letta.server.rest_api.stream_manager import sse_stream_generator
 from letta.server.rest_api.streaming_response import (
     StreamingResponseWithStatusCode,
     add_keepalive_to_stream,
@@ -347,8 +348,8 @@ async def retrieve_conversation_stream(
             ),
         )
 
-    stream = redis_sse_stream_generator(
-        redis_client=redis_client,
+    stream = sse_stream_generator(
+        cache_client=redis_client,
         run_id=run.id,
         starting_after=request.starting_after if request else None,
         poll_interval=request.poll_interval if request else None,

@@ -1,4 +1,4 @@
-"""Redis stream manager for reading and writing SSE chunks with batching and TTL."""
+"""Valkey stream manager for reading and writing SSE chunks with batching and TTL."""
 
 import asyncio
 import json
@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
 from typing import Dict, List, Optional
 
-from letta.data_sources.cache_backend import CacheBackend
+from letta.data_sources.valkey_client import AsyncValkeyClient
 from letta.log import get_logger
 from letta.schemas.enums import RunStatus
 from letta.schemas.letta_message import LettaErrorMessage
@@ -23,12 +23,12 @@ from letta.utils import safe_create_task
 logger = get_logger(__name__)
 
 
-class RedisSSEStreamWriter(SSEStreamWriter):
+class ValkeySSEStreamWriter(SSEStreamWriter):
     """
-    Efficiently writes SSE chunks to Redis streams with batching and TTL management.
+    Efficiently writes SSE chunks to Valkey streams with batching and TTL management.
 
     Features:
-    - Batches writes using Redis pipelines for performance
+    - Batches writes using Valkey pipelines for performance
     - Automatically sets/refreshes TTL on streams
     - Tracks sequential IDs for cursor-based recovery
     - Handles flush on size or time thresholds
@@ -36,23 +36,23 @@ class RedisSSEStreamWriter(SSEStreamWriter):
 
     def __init__(
         self,
-        redis_client: CacheBackend,
+        valkey_client: AsyncValkeyClient,
         flush_interval: float = 0.5,
         flush_size: int = 50,
         stream_ttl_seconds: int = 10800,  # 3 hours default
         max_stream_length: int = 10000,  # Max entries per stream
     ):
         """
-        Initialize the Redis SSE stream writer.
+        Initialize the Valkey SSE stream writer.
 
         Args:
-            redis_client: Cache client instance
+            valkey_client: Valkey client instance
             flush_interval: Seconds between automatic flushes
             flush_size: Number of chunks to buffer before flushing
-            stream_ttl_seconds: TTL for streams in seconds (default: 6 hours)
+            stream_ttl_seconds: TTL for streams in seconds (default: 3 hours)
             max_stream_length: Maximum entries per stream before trimming
         """
-        self.redis = redis_client
+        self.valkey = valkey_client
         self.flush_interval = flush_interval
         self.flush_size = flush_size
         self.stream_ttl = stream_ttl_seconds
@@ -73,7 +73,7 @@ class RedisSSEStreamWriter(SSEStreamWriter):
         """Start the background flush task."""
         if not self._running:
             self._running = True
-            self._flush_task = safe_create_task(self._periodic_flush(), label="redis_periodic_flush")
+            self._flush_task = safe_create_task(self._periodic_flush(), label="valkey_periodic_flush")
 
     async def stop(self):
         """Stop the background flush task and flush remaining data."""
@@ -130,7 +130,7 @@ class RedisSSEStreamWriter(SSEStreamWriter):
         return seq_id
 
     async def _flush_run(self, run_id: str):
-        """Flush buffered chunks for a specific run to Redis."""
+        """Flush buffered chunks for a specific run to Valkey."""
         if not self.buffer[run_id]:
             return
 
@@ -139,19 +139,17 @@ class RedisSSEStreamWriter(SSEStreamWriter):
         stream_key = f"sse:run:{run_id}"
 
         try:
-            client = await self.redis.get_client()
+            # Write chunks to stream
+            for chunk in chunks:
+                await self.valkey.xadd(stream_key, chunk, maxlen=self.max_stream_length, approximate=True)
 
-            async with client.pipeline(transaction=False) as pipe:
-                for chunk in chunks:
-                    await pipe.xadd(stream_key, chunk, maxlen=self.max_stream_length, approximate=True)
-
-                await pipe.expire(stream_key, self.stream_ttl)
-
-                await pipe.execute()
+            # Set TTL on stream
+            client = await self.valkey.get_client()
+            await client.expire(stream_key, self.stream_ttl)
 
             self.last_flush[run_id] = time.time()
 
-            logger.debug(f"Flushed {len(chunks)} chunks to Redis stream {stream_key}, seq_ids {chunks[0]['seq_id']}-{chunks[-1]['seq_id']}")
+            logger.debug(f"Flushed {len(chunks)} chunks to Valkey stream {stream_key}, seq_ids {chunks[0]['seq_id']}-{chunks[-1]['seq_id']}")
 
             if chunks[-1].get("complete") == "true":
                 self._cleanup_run(run_id)
@@ -198,22 +196,22 @@ class RedisSSEStreamWriter(SSEStreamWriter):
 
 async def create_background_stream_processor(
     stream_generator: AsyncGenerator[str | bytes | tuple[str | bytes, int], None],
-    redis_client: AsyncRedisClient,
+    valkey_client: AsyncValkeyClient,
     run_id: str,
-    writer: Optional[RedisSSEStreamWriter] = None,
+    writer: Optional[ValkeySSEStreamWriter] = None,
     run_manager: Optional[RunManager] = None,
     actor: Optional[User] = None,
     conversation_id: Optional[str] = None,
 ) -> None:
     """
-    Process a stream in the background and store chunks to Redis.
+    Process a stream in the background and store chunks to Valkey.
 
     This function consumes the stream generator and writes all chunks
-    to Redis for later retrieval.
+    to Valkey for later retrieval.
 
     Args:
         stream_generator: The async generator yielding SSE chunks
-        redis_client: Redis client instance
+        valkey_client: Valkey client instance
         run_id: The run ID to store chunks under
         writer: Optional pre-configured writer (creates new if not provided)
         run_manager: Optional run manager for updating run status
@@ -226,32 +224,28 @@ async def create_background_stream_processor(
     error_metadata = None
 
     if writer is None:
-        writer = RedisSSEStreamWriter(redis_client)
+        writer = ValkeySSEStreamWriter(valkey_client)
         await writer.start()
         should_stop_writer = True
     else:
         should_stop_writer = False
 
     try:
-        # Always close the upstream async generator so its `finally` blocks run.
-        # (e.g., stream adapters may persist terminal error metadata on close)
         async with aclosing(stream_generator):
             async for chunk in stream_generator:
                 if isinstance(chunk, tuple):
                     chunk = chunk[0]
 
-                # Track terminal events (check at line start to avoid false positives in message content)
+                # Track terminal events
                 if isinstance(chunk, str):
-                    if "\ndata: [DONE]" in chunk or chunk.startswith("data: [DONE]"):
+                    if "data: [DONE]" in chunk:
                         saw_done = True
-                    if "\nevent: error" in chunk or chunk.startswith("event: error"):
+                    if "event: error" in chunk:
                         saw_error = True
 
-                    # Best-effort extraction of the error payload so we can persist it on the run.
-                    # Chunk format is typically: "event: error\ndata: {json}\n\n"
+                    # Best-effort extraction of the error payload
                     if saw_error and error_metadata is None:
                         try:
-                            # Grab the first `data:` line after `event: error`
                             for line in chunk.splitlines():
                                 if line.startswith("data: "):
                                     maybe_json = line[len("data: ") :].strip()
@@ -261,7 +255,6 @@ async def create_background_stream_processor(
                                         error_metadata = {"error": {"message": maybe_json}}
                                     break
                         except Exception:
-                            # Don't let parsing failures interfere with streaming
                             error_metadata = {"error": {"message": "Failed to parse error payload from stream."}}
 
                 is_done = saw_done or saw_error
@@ -282,24 +275,20 @@ async def create_background_stream_processor(
 
         # Stream ended naturally - check if we got a proper terminal
         if not saw_done and not saw_error:
-            # Stream ended without terminal event - synthesize one
             logger.warning(
                 f"Stream for run {run_id} ended without terminal event (no [DONE] or event:error). "
                 f"Last stop_reason seen: {stop_reason}. Synthesizing terminal."
             )
             if stop_reason:
-                # We have a stop_reason, send [DONE]
                 await writer.write_chunk(run_id=run_id, data="data: [DONE]\n\n", is_complete=True)
                 saw_done = True
             else:
-                # No stop_reason and no terminal - this is an error condition
                 error_message = LettaErrorMessage(
                     run_id=run_id,
                     error_type="stream_incomplete",
                     message="Stream ended unexpectedly without stop_reason.",
                     detail=None,
                 )
-                # Write error chunks to Redis instead of yielding (this is a background task, not a generator)
                 await writer.write_chunk(
                     run_id=run_id,
                     data=f"data: {LettaStopReason(stop_reason=StopReasonType.error).model_dump_json()}\n\n",
@@ -311,19 +300,14 @@ async def create_background_stream_processor(
                 await writer.write_chunk(run_id=run_id, data="data: [DONE]\n\n", is_complete=True)
                 saw_error = True
                 saw_done = True
-                # Set a default stop_reason so run status can be mapped in finally
                 stop_reason = StopReasonType.error.value
 
     except RunCancelledException as e:
-        # Handle cancellation gracefully - don't write error chunk, cancellation event was already sent
         logger.info(f"Stream processing stopped due to cancellation for run {run_id}")
-        # The cancellation event was already yielded by cancellation_aware_stream_wrapper
-        # Write [DONE] marker to properly close the stream for clients reading from Redis
         await writer.write_chunk(run_id=run_id, data="data: [DONE]\n\n", is_complete=True)
         saw_done = True
     except Exception as e:
         logger.error(f"Error processing stream for run {run_id}: {e}")
-        # Write error chunk
         stop_reason = StopReasonType.error.value
         error_message = LettaErrorMessage(
             run_id=run_id,
@@ -339,7 +323,6 @@ async def create_background_stream_processor(
         saw_error = True
         saw_done = True
 
-        # Mark run as failed immediately
         if run_manager and actor:
             await run_manager.update_run_by_id_async(
                 run_id=run_id,
@@ -351,18 +334,16 @@ async def create_background_stream_processor(
         if should_stop_writer:
             await writer.stop()
 
-        # Derive a final stop_reason if one wasn't observed explicitly
+        # Derive final stop_reason
         final_stop_reason = stop_reason
         if final_stop_reason is None:
             if saw_error:
                 final_stop_reason = StopReasonType.error.value
             elif saw_done:
-                # Treat DONE without an explicit stop_reason as an error to avoid masking failures
                 final_stop_reason = StopReasonType.error.value
 
-        # Update run status to reflect terminal outcome
+        # Update run status
         if run_manager and actor and final_stop_reason:
-            # Map stop_reason to run status
             if final_stop_reason in [
                 StopReasonType.error.value,
                 StopReasonType.llm_api_error.value,
@@ -395,9 +376,6 @@ async def create_background_stream_processor(
                 conversation_id=conversation_id,
             )
 
-        # Belt-and-suspenders: always append a terminal [DONE] chunk to ensure clients terminate
-        # Even if a previous chunk set `complete`, an extra [DONE] is harmless and ensures SDKs that
-        # rely on explicit [DONE] will exit.
         logger.warning(
             "[Stream Finalizer] Appending forced [DONE] for run=%s (saw_error=%s, saw_done=%s, final_stop_reason=%s)",
             run_id,
@@ -411,42 +389,42 @@ async def create_background_stream_processor(
             logger.warning(f"Failed to append terminal [DONE] for run {run_id}: {e}")
 
 
-async def redis_sse_stream_generator(
-    redis_client: AsyncRedisClient,
+async def valkey_sse_stream_generator(
+    valkey_client: AsyncValkeyClient,
     run_id: str,
     starting_after: Optional[int] = None,
     poll_interval: float = 0.1,
     batch_size: int = 100,
 ) -> AsyncIterator[str]:
     """
-    Generate SSE events from Redis stream chunks.
+    Generate SSE events from Valkey stream chunks.
 
-    This generator reads chunks stored in Redis streams and yields them as SSE events.
+    This generator reads chunks stored in Valkey streams and yields them as SSE events.
     It supports cursor-based recovery by allowing you to start from a specific seq_id.
 
     Args:
-        redis_client: Redis client instance
+        valkey_client: Valkey client instance
         run_id: The run ID to read chunks for
         starting_after: Sequential ID (integer) to start reading from (default: None for beginning)
         poll_interval: Seconds to wait between polls when no new data (default: 0.1)
         batch_size: Number of entries to read per batch (default: 100)
 
     Yields:
-        SSE-formatted chunks from the Redis stream
+        SSE-formatted chunks from the Valkey stream
     """
     stream_key = f"sse:run:{run_id}"
-    last_redis_id = "-"
+    last_valkey_id = "-"
     cursor_seq_id = starting_after or 0
 
-    logger.debug(f"Starting redis_sse_stream_generator for run_id={run_id}, stream_key={stream_key}")
+    logger.debug(f"Starting valkey_sse_stream_generator for run_id={run_id}, stream_key={stream_key}")
 
     while True:
-        entries = await redis_client.xrange(stream_key, start=last_redis_id, count=batch_size)
+        entries = await valkey_client.xrange(stream_key, start=last_valkey_id, count=batch_size)
 
         if entries:
             yielded_any = False
             for entry_id, fields in entries:
-                if entry_id == last_redis_id:
+                if entry_id == last_valkey_id:
                     continue
 
                 chunk_seq_id = int(fields.get("seq_id", 0))
@@ -468,10 +446,10 @@ async def redis_sse_stream_generator(
                     if fields.get("complete") == "true":
                         return
 
-                last_redis_id = entry_id
+                last_valkey_id = entry_id
 
             if not yielded_any and len(entries) > 1:
                 continue
 
-        if not entries or (len(entries) == 1 and entries[0][0] == last_redis_id):
+        if not entries or (len(entries) == 1 and entries[0][0] == last_valkey_id):
             await asyncio.sleep(poll_interval)

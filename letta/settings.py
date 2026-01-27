@@ -286,6 +286,9 @@ class Settings(BaseSettings):
     disable_sqlalchemy_pooling: bool = True
     db_max_concurrent_sessions: Optional[int] = None
 
+    # Cache backend configuration
+    cache_backend_type: Optional[str] = Field(default=None, description="Cache backend type: 'redis', 'valkey', or None for noop")
+    
     redis_host: Optional[str] = Field(default=None, description="Host for Redis instance")
     redis_port: Optional[int] = Field(default=6379, description="Port for Redis instance")
 

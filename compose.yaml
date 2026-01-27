@@ -11,7 +11,7 @@ services:
       - POSTGRES_PASSWORD=${LETTA_PG_PASSWORD:-letta}
       - POSTGRES_DB=${LETTA_PG_DB:-letta}
     volumes:
-      - ./.persist/pgdata:/var/lib/postgresql/data
+      - ./.persist/pgdata:/opt/homebrew/var/postgresql@17
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "${LETTA_PG_PORT:-5432}:5432"
@@ -21,7 +21,9 @@ services:
       timeout: 5s
       retries: 5
   letta_server:
-    image: letta/letta:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     hostname: letta-server
     depends_on:
       letta_db:
@@ -34,22 +36,11 @@ services:
     environment:
       - LETTA_PG_URI=${LETTA_PG_URI:-postgresql://${LETTA_PG_USER:-letta}:${LETTA_PG_PASSWORD:-letta}@${LETTA_DB_HOST:-letta-db}:${LETTA_PG_PORT:-5432}/${LETTA_PG_DB:-letta}}
       - LETTA_DEBUG=True
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
-      - AZURE_API_KEY=${AZURE_API_KEY}
-      - AZURE_BASE_URL=${AZURE_BASE_URL}
-      - AZURE_API_VERSION=${AZURE_API_VERSION}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - VLLM_API_BASE=${VLLM_API_BASE}
-      - OPENLLM_AUTH_TYPE=${OPENLLM_AUTH_TYPE}
-      - OPENLLM_API_KEY=${OPENLLM_API_KEY}
-      - LETTA_OTEL_EXPORTER_OTLP_ENDPOINT=${LETTA_OTEL_EXPORTER_OTLP_ENDPOINT}
-      - CLICKHOUSE_ENDPOINT=${CLICKHOUSE_ENDPOINT}
-      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
-      - CLICKHOUSE_USERNAME=${CLICKHOUSE_USERNAME}
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - LMSTUDIO_MODEL_ID=${LMSTUDIO_MODEL_ID}
+      - LETTA_CACHE_BACKEND_TYPE=${LETTA_CACHE_BACKEND_TYPE:-noop}
+      - LETTA_VALKEY_HOST=${LETTA_VALKEY_HOST:-host.docker.internal}
+      - LETTA_VALKEY_PORT=${LETTA_VALKEY_PORT:-6379}
+      #- LETTA_REDIS_HOST=${LETTA_REDIS_HOST:-letta-redis}
     # volumes:
     # - ./configs/server_config.yaml:/root/.letta/config # config file
     # - ~/.letta/credentials:/root/.letta/credentials # credentials file
