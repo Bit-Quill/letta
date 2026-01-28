@@ -4,7 +4,7 @@ from typing import Annotated, Any, List, Literal, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import Field
 
-from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.noop_client import NoopBackend as NoopAsyncRedisClient
 from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import LettaExpiredError, LettaInvalidArgumentError
 from letta.helpers.datetime_helpers import get_utc_time

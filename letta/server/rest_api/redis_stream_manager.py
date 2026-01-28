@@ -9,6 +9,7 @@ from contextlib import aclosing
 from typing import Dict, List, Optional
 
 from letta.data_sources.cache_backend import CacheBackend
+from letta.data_sources.redis_client import AsyncRedisClient
 from letta.log import get_logger
 from letta.schemas.enums import RunStatus
 from letta.schemas.letta_message import LettaErrorMessage
