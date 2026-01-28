@@ -73,12 +73,21 @@ async def create_background_stream_processor(
     # Import here to avoid circular dependencies
     from letta.data_sources.cache_backend import CacheBackend
     from letta.data_sources.noop_client import NoopBackend as NoopAsyncCacheClient
+    from letta.log import get_logger
+    
+    logger = get_logger(__name__)
+    logger.info(f"!!! ENTERED create_background_stream_processor for run_id={run_id} !!!")
 
-    if isinstance(cache_client, (NoopAsyncCacheClient, CacheBackend)):
+    if isinstance(cache_client, NoopAsyncCacheClient):
+        logger.info(f"!!! NOOP CLIENT DETECTED - consuming stream without storing for run_id={run_id} !!!")
         # No-op: just consume the stream
         async for _ in stream_generator:
             pass
         return
+
+    # Debug logging
+    logger.info(f"!!! BACKGROUND STREAM PROCESSOR STARTED for run_id={run_id} !!!")
+    logger.info(f"Background stream processor: cache_client type = {type(cache_client)}, module = {type(cache_client).__module__}")
 
     # Try Redis implementation
     try:
@@ -87,10 +96,15 @@ async def create_background_stream_processor(
             create_background_stream_processor as redis_processor,
         )
 
+        logger.info(f"Checking isinstance for AsyncRedisClient: {isinstance(cache_client, AsyncRedisClient)}")
         if isinstance(cache_client, AsyncRedisClient):
+            logger.info(f"Delegating to redis_processor for run_id={run_id}")
             await redis_processor(stream_generator, cache_client, run_id, writer, run_manager, actor, conversation_id)
             return
-    except ImportError:
+        else:
+            logger.warning(f"cache_client is not AsyncRedisClient, it's {type(cache_client)}")
+    except ImportError as e:
+        logger.error(f"Failed to import Redis components: {e}")
         pass
 
     # Try Valkey implementation
@@ -134,10 +148,9 @@ async def sse_stream_generator(
         SSE-formatted chunks from the stream
     """
     # Import here to avoid circular dependencies
-    from letta.data_sources.cache_backend import NoopBackend
-    from letta.data_sources.noop_client import NoopAsyncCacheClient
+    from letta.data_sources.noop_client import NoopBackend as NoopAsyncCacheClient
 
-    if isinstance(cache_client, (NoopBackend, NoopAsyncCacheClient)):
+    if isinstance(cache_client, NoopAsyncCacheClient):
         # No-op: yield nothing
         return
 

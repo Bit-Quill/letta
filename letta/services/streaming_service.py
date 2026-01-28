@@ -10,7 +10,7 @@ from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
 from letta.agents.agent_loop import AgentLoop
 from letta.agents.base_agent_v2 import BaseAgentV2
 from letta.constants import REDIS_RUN_ID_PREFIX
-from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.noop_client import NoopBackend as NoopAsyncRedisClient
 from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import (
     LettaInvalidArgumentError,
@@ -154,7 +154,9 @@ class StreamingService:
                 )
 
                 # handle background streaming if requested
+                logger.info(f"Checking background streaming: request.background={request.background}, settings.track_agent_run={settings.track_agent_run}, run={run}")
                 if request.background and settings.track_agent_run:
+                    logger.info(f"Background streaming enabled for run_id={run.id if run else None}")
                     if isinstance(redis_client, NoopAsyncRedisClient):
                         raise LettaServiceUnavailableError(
                             f"Background streaming requires Redis to be running. "
@@ -174,10 +176,11 @@ class StreamingService:
                             cancellation_event=get_cancellation_event_for_run(run.id),
                         )
 
-                    safe_create_task(
+                    logger.info(f"!!! ABOUT TO CREATE BACKGROUND TASK for run_id={run.id}, cache_client type={type(redis_client)} !!!")
+                    task = safe_create_task(
                         create_background_stream_processor(
                             stream_generator=background_stream,
-                            redis_client=redis_client,
+                            cache_client=redis_client,
                             run_id=run.id,
                             run_manager=self.server.run_manager,
                             actor=actor,
@@ -185,6 +188,7 @@ class StreamingService:
                         ),
                         label=f"background_stream_processor_{run.id}",
                     )
+                    logger.info(f"Created background stream processor task for run_id={run.id}, task={task}")
 
                     raw_stream = sse_stream_generator(
                         cache_client=redis_client,

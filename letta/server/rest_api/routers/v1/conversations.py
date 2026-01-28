@@ -8,7 +8,7 @@ from starlette.responses import StreamingResponse
 from letta.agents.agent_loop import AgentLoop
 from letta.agents.letta_agent_v3 import LettaAgentV3
 from letta.errors import LettaExpiredError, LettaInvalidArgumentError, NoActiveRunsToCancelError
-from letta.data_sources import noop_client as NoopAsyncRedisClient
+from letta.data_sources.noop_client import NoopBackend as NoopAsyncRedisClient
 from letta.data_sources.cache_backend import get_redis_client
 from letta.errors import LettaExpiredError, LettaInvalidArgumentError
 from letta.helpers.datetime_helpers import get_utc_time
