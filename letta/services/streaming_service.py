@@ -116,20 +116,22 @@ class StreamingService:
         model_compatible = self._is_model_compatible(agent)
         model_compatible_token_streaming = self._is_token_streaming_compatible(agent)
 
-        # Attempt to acquire conversation lock if conversation_id is provided
-        # This prevents concurrent message processing for the same conversation
-        # Skip locking if Redis is not available (graceful degradation)
-        if conversation_id and not isinstance(redis_client, NoopAsyncRedisClient):
-            await redis_client.acquire_conversation_lock(
-                conversation_id=conversation_id,
-                token=str(uuid4()),
-            )
-
         # create run if tracking is enabled
         run = None
         run_update_metadata = None
+        lock_token = None
 
         try:
+            # Attempt to acquire conversation lock if conversation_id is provided
+            # This prevents concurrent message processing for the same conversation
+            # Skip locking if Redis is not available (graceful degradation)
+            if conversation_id and not isinstance(redis_client, NoopAsyncRedisClient):
+                lock_token = str(uuid4())
+                await redis_client.acquire_conversation_lock(
+                    conversation_id=conversation_id,
+                    token=lock_token,
+                )
+
             if settings.track_agent_run:
                 run = await self._create_run(agent_id, request, run_type, actor, conversation_id=conversation_id)
                 await redis_client.set(f"{REDIS_RUN_ID_PREFIX}:{agent_id}", run.id if run else None)
@@ -252,6 +254,15 @@ class StreamingService:
                 run_status = RunStatus.failed
             raise
         finally:
+            # Release conversation lock if it was acquired
+            if lock_token and conversation_id and not isinstance(redis_client, NoopAsyncRedisClient):
+                try:
+                    await redis_client.release_conversation_lock(conversation_id)
+                    logger.debug(f"Released conversation lock for conversation_id={conversation_id}")
+                except Exception as lock_error:
+                    logger.warning(f"Failed to release conversation lock for conversation {conversation_id}: {lock_error}")
+
+            # Update run status if tracking is enabled
             if settings.track_agent_run and run and run_status:
                 await self.server.run_manager.update_run_by_id_async(
                     run_id=run.id,
