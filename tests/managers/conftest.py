@@ -58,7 +58,7 @@ if _embedding_endpoint and _embedding_model:
     )
 else:
     # Default to OpenAI for standard test runs
-    DEFAULT_EMBEDDING_CONFIG = DEFAULT_EMBEDDING_CONFIG
+    DEFAULT_EMBEDDING_CONFIG = EmbeddingConfig.default_config(provider="openai")
 
 # Allow overriding LLM config via environment variables for local testing
 _llm_endpoint = os.getenv("LETTA_TEST_LLM_ENDPOINT")
@@ -74,7 +74,7 @@ if _llm_endpoint and _llm_model:
     )
 else:
     # Default to OpenAI for standard test runs
-    DEFAULT_LLM_CONFIG = DEFAULT_LLM_CONFIG
+    DEFAULT_LLM_CONFIG = LLMConfig.default_config("gpt-4o-mini")
 
 CREATE_DELAY_SQLITE = 1
 USING_SQLITE = not bool(os.getenv("LETTA_PG_URI"))
