@@ -248,7 +248,7 @@ class StreamingResponseWithStatusCode(StreamingResponse):
         more_body = True
         try:
             first_chunk = await self.body_iterator.__anext__()
-            logger.debug("stream_response first chunk:", first_chunk)
+            logger.debug("stream_response first chunk: %s", first_chunk)
             if isinstance(first_chunk, tuple):
                 first_chunk_content, self.status_code = first_chunk
             else:
@@ -350,7 +350,7 @@ class StreamingResponseWithStatusCode(StreamingResponse):
             # error_resp = {"error": {"message": str(exc)}}
             error_resp = {"error": str(exc), "code": "INTERNAL_SERVER_ERROR"}
             error_event = f"event: error\ndata: {json.dumps(error_resp)}\n\n".encode(self.charset)
-            logger.debug("response_started:", self.response_started)
+            logger.debug("response_started: %s", self.response_started)
             if not self.response_started:
                 await send(
                     {

@@ -100,8 +100,8 @@ class EphemeralSummaryAgent(BaseAgent):
 
         await self.block_manager.update_block_async(block_id=block.id, block_update=BlockUpdate(value=summary), actor=self.actor)
 
-        logger.debug("block:", block)
-        logger.debug("summary:", summary)
+        logger.debug("block: %s", block)
+        logger.debug("summary: %s", summary)
 
         return [
             Message(
