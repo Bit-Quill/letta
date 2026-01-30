@@ -208,12 +208,12 @@ async def _create_redis_backend():
 async def _create_valkey_backend():
     """Create Valkey backend instance."""
     import logging
-    from letta.data_sources.valkey_client import ValkeyBackend as AsyncValkeyClient
+    from letta.data_sources.valkey_client import ValkeyBackend
     from letta.settings import settings
 
     logging.info(f"Creating Valkey backend with host={settings.valkey_host!r} (type={type(settings.valkey_host)}), port={settings.valkey_port!r} (type={type(settings.valkey_port)})")
     
-    return AsyncValkeyClient(
+    return ValkeyBackend(
         host=settings.valkey_host,
         port=settings.valkey_port,
     )

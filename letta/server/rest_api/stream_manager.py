@@ -109,12 +109,12 @@ async def create_background_stream_processor(
 
     # Try Valkey implementation
     try:
-        from letta.data_sources.valkey_client import AsyncValkeyClient
+        from letta.data_sources.valkey_client import ValkeyBackend
         from letta.server.rest_api.valkey_stream_manager import (
             create_background_stream_processor as valkey_processor,
         )
 
-        if isinstance(cache_client, AsyncValkeyClient):
+        if isinstance(cache_client, ValkeyBackend):
             await valkey_processor(stream_generator, cache_client, run_id, writer, run_manager, actor, conversation_id)
             return
     except ImportError:
@@ -168,10 +168,10 @@ async def sse_stream_generator(
 
     # Try Valkey implementation
     try:
-        from letta.data_sources.valkey_client import AsyncValkeyClient
+        from letta.data_sources.valkey_client import ValkeyBackend
         from letta.server.rest_api.valkey_stream_manager import valkey_sse_stream_generator
 
-        if isinstance(cache_client, AsyncValkeyClient):
+        if isinstance(cache_client, ValkeyBackend):
             async for chunk in valkey_sse_stream_generator(cache_client, run_id, starting_after, poll_interval, batch_size):
                 yield chunk
             return

@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
 from typing import Dict, List, Optional
 
-from letta.data_sources.valkey_client import AsyncValkeyClient
+from letta.data_sources.valkey_client import ValkeyBackend
 from letta.log import get_logger
 from letta.schemas.enums import RunStatus
 from letta.schemas.letta_message import LettaErrorMessage
@@ -36,7 +36,7 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
 
     def __init__(
         self,
-        valkey_client: AsyncValkeyClient,
+        valkey_client: ValkeyBackend,
         flush_interval: float = 0.5,
         flush_size: int = 50,
         stream_ttl_seconds: int = 10800,  # 3 hours default
@@ -196,7 +196,7 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
 
 async def create_background_stream_processor(
     stream_generator: AsyncGenerator[str | bytes | tuple[str | bytes, int], None],
-    valkey_client: AsyncValkeyClient,
+    valkey_client: ValkeyBackend,
     run_id: str,
     writer: Optional[ValkeySSEStreamWriter] = None,
     run_manager: Optional[RunManager] = None,
@@ -390,7 +390,7 @@ async def create_background_stream_processor(
 
 
 async def valkey_sse_stream_generator(
-    valkey_client: AsyncValkeyClient,
+    valkey_client: ValkeyBackend,
     run_id: str,
     starting_after: Optional[int] = None,
     poll_interval: float = 0.1,
