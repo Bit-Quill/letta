@@ -23,6 +23,8 @@ from letta.schemas.model import ModelSettings
 from letta.schemas.run import Run as PydanticRun, RunUpdate
 from letta.server.server import SyncServer
 from letta.services.streaming_service import StreamingService
+from tests.managers.conftest import DEFAULT_EMBEDDING_CONFIG, DEFAULT_LLM_CONFIG
+
 
 
 @pytest.fixture
@@ -33,8 +35,8 @@ async def test_agent_with_tool(server: SyncServer, default_user, print_tool):
             name="test_cancellation_agent",
             agent_type="letta_v1_agent",
             memory_blocks=[],
-            llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            llm_config=DEFAULT_LLM_CONFIG,
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             tool_ids=[print_tool.id],
             include_base_tools=False,
         ),
@@ -1166,15 +1168,15 @@ class TestApprovalFlowCancellation:
         - New runs can be created after cancellation
         """
         # Create agent with parallel tool calling enabled
-        config = LLMConfig.default_config("gpt-4o-mini")
+        config = DEFAULT_LLM_CONFIG
         config.parallel_tool_calls = True
         agent_state = await server.agent_manager.create_agent_async(
             agent_create=CreateAgent(
                 name="test_parallel_tool_calling_agent",
                 agent_type="letta_v1_agent",
                 memory_blocks=[],
-                llm_config=LLMConfig.default_config("gpt-4o-mini"),
-                embedding_config=EmbeddingConfig.default_config(provider="openai"),
+                llm_config=DEFAULT_LLM_CONFIG,
+                embedding_config=DEFAULT_EMBEDDING_CONFIG,
                 tool_ids=[bash_tool.id],
                 include_base_tools=False,
             ),

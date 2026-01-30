@@ -27,7 +27,9 @@ from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm.exc import StaleDataError
 
 from letta.config import LettaConfig
+
 from letta.constants import (
+
     BASE_MEMORY_TOOLS,
     BASE_SLEEPTIME_TOOLS,
     BASE_TOOLS,
@@ -44,20 +46,35 @@ from letta.constants import (
     MULTI_AGENT_TOOLS,
 )
 from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
+
 from letta.errors import LettaAgentNotFoundError
+
 from letta.functions.functions import derive_openai_json_schema, parse_source_code
+
 from letta.functions.mcp_client.types import MCPTool
+
 from letta.helpers import ToolRulesSolver
+
 from letta.helpers.datetime_helpers import AsyncTimer
+
 from letta.jobs.types import ItemUpdateInfo, RequestStatusUpdateInfo, StepStatusUpdateInfo
+
 from letta.orm import Base, Block
+
 from letta.orm.block_history import BlockHistory
+
 from letta.orm.errors import NoResultFound, UniqueConstraintViolationError
+
 from letta.orm.file import FileContent as FileContentModel, FileMetadata as FileMetadataModel
+
 from letta.schemas.agent import AgentRelationships, AgentState, CreateAgent, UpdateAgent
+
 from letta.schemas.block import Block as PydanticBlock, BlockUpdate, CreateBlock
+
 from letta.schemas.embedding_config import EmbeddingConfig
+
 from letta.schemas.enums import (
+
     ActorType,
     AgentStepStatus,
     FileProcessingStatus,
@@ -72,32 +89,59 @@ from letta.schemas.enums import (
     VectorDBProvider,
 )
 from letta.schemas.environment_variables import SandboxEnvironmentVariableCreate, SandboxEnvironmentVariableUpdate
+
 from letta.schemas.file import FileMetadata, FileMetadata as PydanticFileMetadata
+
 from letta.schemas.identity import IdentityCreate, IdentityProperty, IdentityPropertyType, IdentityType, IdentityUpdate, IdentityUpsert
+
 from letta.schemas.job import BatchJob, Job, Job as PydanticJob, JobUpdate, LettaRequestConfig
+
 from letta.schemas.letta_message import UpdateAssistantMessage, UpdateReasoningMessage, UpdateSystemMessage, UpdateUserMessage
+
 from letta.schemas.letta_message_content import TextContent
+
 from letta.schemas.letta_stop_reason import LettaStopReason, StopReasonType
+
 from letta.schemas.llm_batch_job import AgentStepState, LLMBatchItem
+
 from letta.schemas.llm_config import LLMConfig
+
 from letta.schemas.message import Message as PydanticMessage, MessageCreate, MessageUpdate
+
 from letta.schemas.openai.chat_completion_response import UsageStatistics
+
 from letta.schemas.organization import Organization, Organization as PydanticOrganization, OrganizationUpdate
+
 from letta.schemas.passage import Passage as PydanticPassage
+
 from letta.schemas.pip_requirement import PipRequirement
+
 from letta.schemas.run import Run as PydanticRun
+
 from letta.schemas.sandbox_config import E2BSandboxConfig, LocalSandboxConfig, SandboxConfigCreate, SandboxConfigUpdate
+
 from letta.schemas.source import Source as PydanticSource, SourceUpdate
+
 from letta.schemas.tool import Tool as PydanticTool, ToolCreate, ToolUpdate
+
 from letta.schemas.tool_rule import InitToolRule
+
 from letta.schemas.user import User as PydanticUser, UserUpdate
+
 from letta.server.db import db_registry
+
 from letta.server.server import SyncServer
+
 from letta.services.block_manager import BlockManager
+
 from letta.services.helpers.agent_manager_helper import calculate_base_tools, calculate_multi_agent_tools, validate_agent_exists_async
+
 from letta.services.step_manager import FeedbackType
+
 from letta.settings import settings, tool_settings
+
 from letta.utils import calculate_file_defaults_based_on_context_window
+
 from tests.helpers.utils import comprehensive_agent_checks, validate_context_window_overview
 from tests.utils import random_string
 
@@ -140,7 +184,7 @@ async def test_archive_manager_get_agents_for_archive_async(server: SyncServer, 
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -179,7 +223,7 @@ async def test_archive_manager_race_condition_handling(server: SyncServer, defau
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -436,7 +480,7 @@ async def test_archive_manager_attach_agent_to_archive_async(server: SyncServer,
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -492,7 +536,7 @@ async def test_archive_manager_detach_agent_from_archive_async(server: SyncServe
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -504,7 +548,7 @@ async def test_archive_manager_detach_agent_from_archive_async(server: SyncServe
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -568,7 +612,7 @@ async def test_archive_manager_attach_detach_idempotency(server: SyncServer, def
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -597,7 +641,7 @@ async def test_archive_manager_attach_detach_idempotency(server: SyncServer, def
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -635,7 +679,7 @@ async def test_archive_manager_detach_with_multiple_archives(server: SyncServer,
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -647,7 +691,7 @@ async def test_archive_manager_detach_with_multiple_archives(server: SyncServer,
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -703,7 +747,7 @@ async def test_archive_manager_detach_deleted_agent(server: SyncServer, default_
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -748,7 +792,7 @@ async def test_archive_manager_cascade_delete_on_archive_deletion(server: SyncSe
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -760,7 +804,7 @@ async def test_archive_manager_cascade_delete_on_archive_deletion(server: SyncSe
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -831,7 +875,7 @@ async def test_archive_manager_list_agents_with_pagination(server: SyncServer, d
                 agent_type="memgpt_v2_agent",
                 memory_blocks=[],
                 llm_config=LLMConfig.default_config("gpt-4o-mini"),
-                embedding_config=EmbeddingConfig.default_config(provider="openai"),
+                embedding_config=DEFAULT_EMBEDDING_CONFIG,
                 include_base_tools=False,
             ),
             actor=default_user,
@@ -888,7 +932,7 @@ async def test_archive_manager_get_default_archive_for_agent_async(server: SyncS
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -958,7 +1002,7 @@ async def test_archive_manager_get_agents_with_include_parameter(server: SyncSer
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -1246,7 +1290,13 @@ async def test_archive_manager_create_passage_in_nonexistent_archive(server: Syn
 async def test_archive_manager_create_passage_inherits_embedding_config(server: SyncServer, default_user):
     """Test that created passages inherit the archive's embedding configuration."""
     # create archive with specific embedding config
-    specific_embedding_config = EmbeddingConfig.default_config(provider="openai")
+    specific_embedding_config = EmbeddingConfig(
+        embedding_endpoint_type="openai",
+        embedding_endpoint="http://localhost:1234/v1",
+        embedding_model="text-embedding-nomic-embed-text-v1.5",
+        embedding_dim=768,
+        embedding_chunk_size=300,
+    )
 
     archive = await server.archive_manager.create_archive_async(
         name="test_embedding_inheritance_archive",

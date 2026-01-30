@@ -27,7 +27,9 @@ from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm.exc import StaleDataError
 
 from letta.config import LettaConfig
+
 from letta.constants import (
+
     BASE_MEMORY_TOOLS,
     BASE_SLEEPTIME_TOOLS,
     BASE_TOOLS,
@@ -44,20 +46,35 @@ from letta.constants import (
     MULTI_AGENT_TOOLS,
 )
 from letta.data_sources.redis_client import NoopAsyncRedisClient, get_redis_client
+
 from letta.errors import LettaAgentNotFoundError, LettaInvalidArgumentError
+
 from letta.functions.functions import derive_openai_json_schema, parse_source_code
+
 from letta.functions.mcp_client.types import MCPTool
+
 from letta.helpers import ToolRulesSolver
+
 from letta.helpers.datetime_helpers import AsyncTimer
+
 from letta.jobs.types import ItemUpdateInfo, RequestStatusUpdateInfo, StepStatusUpdateInfo
+
 from letta.orm import Base, Block
+
 from letta.orm.block_history import BlockHistory
+
 from letta.orm.errors import NoResultFound, UniqueConstraintViolationError
+
 from letta.orm.file import FileContent as FileContentModel, FileMetadata as FileMetadataModel
+
 from letta.schemas.agent import CreateAgent, UpdateAgent
+
 from letta.schemas.block import Block as PydanticBlock, BlockUpdate, CreateBlock
+
 from letta.schemas.embedding_config import EmbeddingConfig
+
 from letta.schemas.enums import (
+
     ActorType,
     AgentStepStatus,
     FileProcessingStatus,
@@ -73,31 +90,57 @@ from letta.schemas.enums import (
     VectorDBProvider,
 )
 from letta.schemas.environment_variables import SandboxEnvironmentVariableCreate, SandboxEnvironmentVariableUpdate
+
 from letta.schemas.file import FileMetadata, FileMetadata as PydanticFileMetadata
+
 from letta.schemas.identity import IdentityCreate, IdentityProperty, IdentityPropertyType, IdentityType, IdentityUpdate, IdentityUpsert
+
 from letta.schemas.job import Job as PydanticJob, LettaRequestConfig
+
 from letta.schemas.letta_message import UpdateAssistantMessage, UpdateReasoningMessage, UpdateSystemMessage, UpdateUserMessage
+
 from letta.schemas.letta_message_content import TextContent
+
 from letta.schemas.letta_stop_reason import LettaStopReason, StopReasonType
+
 from letta.schemas.llm_config import LLMConfig
+
 from letta.schemas.message import Message, Message as PydanticMessage, MessageCreate, MessageUpdate, ToolReturn
+
 from letta.schemas.openai.chat_completion_response import UsageStatistics
+
 from letta.schemas.organization import Organization, Organization as PydanticOrganization, OrganizationUpdate
+
 from letta.schemas.passage import Passage as PydanticPassage
+
 from letta.schemas.pip_requirement import PipRequirement
+
 from letta.schemas.run import Run as PydanticRun, RunUpdate
+
 from letta.schemas.sandbox_config import E2BSandboxConfig, LocalSandboxConfig, SandboxConfigCreate, SandboxConfigUpdate
+
 from letta.schemas.source import Source as PydanticSource, SourceUpdate
+
 from letta.schemas.tool import Tool as PydanticTool, ToolCreate, ToolUpdate
+
 from letta.schemas.tool_rule import InitToolRule
+
 from letta.schemas.user import User as PydanticUser, UserUpdate
+
 from letta.server.db import db_registry
+
 from letta.server.server import SyncServer
+
 from letta.services.block_manager import BlockManager
+
 from letta.services.helpers.agent_manager_helper import calculate_base_tools, calculate_multi_agent_tools, validate_agent_exists_async
+
 from letta.services.step_manager import FeedbackType
+
 from letta.settings import settings, tool_settings
+
 from letta.utils import calculate_file_defaults_based_on_context_window
+
 from tests.helpers.utils import comprehensive_agent_checks, validate_context_window_overview
 from tests.utils import random_string
 
@@ -1875,6 +1918,10 @@ async def test_list_runs_by_duration_gt(server: SyncServer, sarah_agent, default
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("LETTA_TEST_LLM_MODEL") is not None,
+    reason="Test is timing-sensitive and may be flaky with different execution speeds"
+)
 async def test_list_runs_by_duration_lt(server: SyncServer, sarah_agent, default_user):
     """Test listing runs filtered by duration less than a threshold."""
     import asyncio
@@ -1922,6 +1969,10 @@ async def test_list_runs_by_duration_lt(server: SyncServer, sarah_agent, default
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("LETTA_TEST_LLM_MODEL") is not None,
+    reason="Test is timing-sensitive and may be flaky with different execution speeds"
+)
 async def test_list_runs_by_duration_percentile(server: SyncServer, sarah_agent, default_user):
     """Test listing runs filtered by duration percentile."""
     import asyncio

@@ -152,6 +152,10 @@ def agent_state(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("SKIP_EXTERNAL_MCP_TESTS", "false").lower() == "true",
+    reason="Test requires external MCP server connectivity"
+)
 async def test_sse_mcp_server(client, agent_state):
     mcp_server_name = "deepwiki"
     server_url = "https://mcp.deepwiki.com/sse"
@@ -209,6 +213,10 @@ async def test_sse_mcp_server(client, agent_state):
         assert mcp_server_name not in server_names
 
 
+@pytest.mark.skipif(
+    os.getenv("SKIP_EXTERNAL_MCP_TESTS", "false").lower() == "true",
+    reason="Test requires local MCP server setup"
+)
 def test_stdio_mcp_server(client, agent_state, server_url):
     req_file = Path(__file__).parent / "weather" / "requirements.txt"
     create_virtualenv_and_install_requirements(req_file, name="venv")

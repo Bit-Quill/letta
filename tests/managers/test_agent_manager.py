@@ -27,7 +27,9 @@ from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm.exc import StaleDataError
 
 from letta.config import LettaConfig
+
 from letta.constants import (
+
     BASE_MEMORY_TOOLS,
     BASE_SLEEPTIME_TOOLS,
     BASE_TOOLS,
@@ -44,21 +46,37 @@ from letta.constants import (
     MULTI_AGENT_TOOLS,
 )
 from letta.data_sources import noop_client as NoopAsyncRedisClient
+
 from letta.data_sources.cache_backend import get_redis_client
+
 from letta.errors import LettaAgentNotFoundError
+
 from letta.functions.functions import derive_openai_json_schema, parse_source_code
+
 from letta.functions.mcp_client.types import MCPTool
+
 from letta.helpers import ToolRulesSolver
+
 from letta.helpers.datetime_helpers import AsyncTimer
+
 from letta.jobs.types import ItemUpdateInfo, RequestStatusUpdateInfo, StepStatusUpdateInfo
+
 from letta.orm import Base, Block
+
 from letta.orm.block_history import BlockHistory
+
 from letta.orm.errors import NoResultFound, UniqueConstraintViolationError
+
 from letta.orm.file import FileContent as FileContentModel, FileMetadata as FileMetadataModel
+
 from letta.schemas.agent import CreateAgent, InternalTemplateAgentCreate, UpdateAgent
+
 from letta.schemas.block import Block as PydanticBlock, BlockUpdate, CreateBlock
+
 from letta.schemas.embedding_config import EmbeddingConfig
+
 from letta.schemas.enums import (
+
     ActorType,
     AgentStepStatus,
     FileProcessingStatus,
@@ -73,34 +91,63 @@ from letta.schemas.enums import (
     VectorDBProvider,
 )
 from letta.schemas.environment_variables import SandboxEnvironmentVariableCreate, SandboxEnvironmentVariableUpdate
+
 from letta.schemas.file import FileMetadata, FileMetadata as PydanticFileMetadata
+
 from letta.schemas.identity import IdentityCreate, IdentityProperty, IdentityPropertyType, IdentityType, IdentityUpdate, IdentityUpsert
+
 from letta.schemas.job import BatchJob, Job, Job as PydanticJob, JobUpdate, LettaRequestConfig
+
 from letta.schemas.letta_message import UpdateAssistantMessage, UpdateReasoningMessage, UpdateSystemMessage, UpdateUserMessage
+
 from letta.schemas.letta_message_content import TextContent
+
 from letta.schemas.letta_stop_reason import LettaStopReason, StopReasonType
+
 from letta.schemas.llm_batch_job import AgentStepState, LLMBatchItem
+
 from letta.schemas.llm_config import LLMConfig
+
 from letta.schemas.message import Message as PydanticMessage, MessageCreate, MessageUpdate
+
 from letta.schemas.model import ModelSettings
+
 from letta.schemas.openai.chat_completion_response import UsageStatistics
+
 from letta.schemas.organization import Organization, Organization as PydanticOrganization, OrganizationUpdate
+
 from letta.schemas.passage import Passage as PydanticPassage
+
 from letta.schemas.pip_requirement import PipRequirement
+
 from letta.schemas.run import Run as PydanticRun
+
 from letta.schemas.sandbox_config import E2BSandboxConfig, LocalSandboxConfig, SandboxConfigCreate, SandboxConfigUpdate
+
 from letta.schemas.source import Source as PydanticSource, SourceUpdate
+
 from letta.schemas.tool import Tool as PydanticTool, ToolCreate, ToolUpdate
+
 from letta.schemas.tool_rule import InitToolRule
+
 from letta.schemas.user import User as PydanticUser, UserUpdate
+
 from letta.server.db import db_registry
+
 from letta.server.server import SyncServer
+
 from letta.services.block_manager import BlockManager
+
 from letta.services.helpers.agent_manager_helper import calculate_base_tools, calculate_multi_agent_tools, validate_agent_exists_async
+
 from letta.services.step_manager import FeedbackType
+
 from letta.services.summarizer.summarizer_config import CompactionSettings
+
 from letta.settings import settings, tool_settings
+
 from letta.utils import calculate_file_defaults_based_on_context_window
+
 from tests.helpers.utils import comprehensive_agent_checks, validate_context_window_overview
 from tests.utils import random_string
 
@@ -173,7 +220,7 @@ async def test_create_agent_include_base_tools(server: SyncServer, default_user)
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         include_base_tools=True,
     )
 
@@ -204,7 +251,7 @@ async def test_create_agent_base_tool_rules_excluded_providers(server: SyncServe
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),  # This has model_endpoint_type="openai"
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         include_base_tool_rules=False,
     )
 
@@ -239,7 +286,7 @@ async def test_create_agent_base_tool_rules_non_excluded_providers(server: SyncS
             model_endpoint="https://api.together.xyz",
             context_window=8192,
         ),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         include_base_tool_rules=True,  # Should remain True
     )
 
@@ -291,7 +338,7 @@ async def test_create_agent_with_model_handle_uses_correct_llm_config(server: Sy
                 agent_type="memgpt_v2_agent",
                 # Use new model handle field instead of llm_config
                 model=model_handle,
-                embedding_config=EmbeddingConfig.default_config(provider="openai"),
+                embedding_config=DEFAULT_EMBEDDING_CONFIG,
                 memory_blocks=[],
                 include_base_tools=False,
             ),
@@ -366,7 +413,7 @@ async def test_compaction_settings_model_uses_separate_llm_config_for_summarizat
         system="You are a helpful assistant.",
         agent_type=AgentType.letta_v1_agent,
         llm_config=base_llm_config,
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         model=None,
         embedding=None,
         model_settings=None,
@@ -507,7 +554,7 @@ async def test_create_agent_with_default_source(server: SyncServer, default_user
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tool_ids=[print_tool.id],
         include_default_source=True,  # This is the key field we're testing
@@ -542,7 +589,7 @@ async def test_create_agent_with_default_source(server: SyncServer, default_user
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tool_ids=[print_tool.id],
         include_default_source=False,  # Explicitly set to False
@@ -601,7 +648,7 @@ async def test_create_agent_passed_in_initial_messages(server: SyncServer, defau
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tags=["a", "b"],
         description="test_description",
@@ -631,7 +678,7 @@ async def test_create_agent_default_initial_message(server: SyncServer, default_
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tags=["a", "b"],
         description="test_description",
@@ -661,7 +708,7 @@ async def test_create_agent_with_json_in_system_message(server: SyncServer, defa
         agent_type="memgpt_v2_agent",
         system=system_prompt,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tags=["a", "b"],
         description="test_description",
@@ -730,7 +777,7 @@ async def test_create_agent_with_compaction_settings(server: SyncServer, default
         agent_type="memgpt_v2_agent",
         system="test system",
         llm_config=llm_config,
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         include_base_tools=True,
         compaction_settings=compaction_settings,
@@ -801,7 +848,7 @@ async def test_agent_file_defaults_based_on_context_window(server: SyncServer, d
         name="test_agent_small_context",
         agent_type="memgpt_v2_agent",
         llm_config=llm_config_small,
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         include_base_tools=False,
     )
@@ -822,7 +869,7 @@ async def test_agent_file_defaults_based_on_context_window(server: SyncServer, d
         name="test_agent_medium_context",
         agent_type="memgpt_v2_agent",
         llm_config=llm_config_medium,
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         include_base_tools=False,
     )
@@ -843,7 +890,7 @@ async def test_agent_file_defaults_based_on_context_window(server: SyncServer, d
         name="test_agent_large_context",
         agent_type="memgpt_v2_agent",
         llm_config=llm_config_large,
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         include_base_tools=False,
     )
@@ -868,7 +915,7 @@ async def test_agent_file_defaults_explicit_values(server: SyncServer, default_u
         name="test_agent_explicit_values",
         agent_type="memgpt_v2_agent",
         llm_config=llm_config_explicit,
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         include_base_tools=False,
         max_files_open=20,  # explicit value
@@ -1053,7 +1100,7 @@ async def test_list_agents_ascending(server: SyncServer, default_user):
             name="agent_oldest",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1068,7 +1115,7 @@ async def test_list_agents_ascending(server: SyncServer, default_user):
             name="agent_newest",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1088,7 +1135,7 @@ async def test_list_agents_descending(server: SyncServer, default_user):
             name="agent_oldest",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1103,7 +1150,7 @@ async def test_list_agents_descending(server: SyncServer, default_user):
             name="agent_newest",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1123,7 +1170,7 @@ async def test_list_agents_by_last_stop_reason(server: SyncServer, default_user)
             name="agent_requires_approval",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1141,7 +1188,7 @@ async def test_list_agents_by_last_stop_reason(server: SyncServer, default_user)
             name="agent_error",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1159,7 +1206,7 @@ async def test_list_agents_by_last_stop_reason(server: SyncServer, default_user)
             name="agent_no_stop_reason",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -1193,7 +1240,7 @@ async def test_count_agents_with_filters(server: SyncServer, default_user):
             name="agent_requires_approval",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
             tags=["inbox", "test"],
@@ -1211,7 +1258,7 @@ async def test_count_agents_with_filters(server: SyncServer, default_user):
             name="agent_error",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
             tags=["error", "test"],
@@ -1229,7 +1276,7 @@ async def test_count_agents_with_filters(server: SyncServer, default_user):
             name="agent_completed",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
             tags=["completed"],
@@ -1247,7 +1294,7 @@ async def test_count_agents_with_filters(server: SyncServer, default_user):
             name="agent_no_stop_reason",
             agent_type="memgpt_v2_agent",
             llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
             tags=["test"],
@@ -1309,7 +1356,7 @@ async def test_list_agents_ordering_and_pagination(server: SyncServer, default_u
                 agent_type="memgpt_v2_agent",
                 memory_blocks=[],
                 llm_config=LLMConfig.default_config("gpt-4o-mini"),
-                embedding_config=EmbeddingConfig.default_config(provider="openai"),
+                embedding_config=DEFAULT_EMBEDDING_CONFIG,
                 include_base_tools=False,
             ),
             actor=default_user,
@@ -1950,7 +1997,7 @@ async def test_agent_state_relationship_loads(server: SyncServer, default_user, 
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tool_ids=[print_tool.id],
         include_default_source=True,
@@ -2019,7 +2066,7 @@ async def test_create_template_agent_with_files_from_sources(server: SyncServer,
     source = await server.source_manager.create_source(
         source=PydanticSource(
             name="test_template_source",
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
         ),
         actor=default_user,
     )
@@ -2046,7 +2093,7 @@ async def test_create_template_agent_with_files_from_sources(server: SyncServer,
         system="test system",
         memory_blocks=memory_blocks,
         llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tool_ids=[print_tool.id],
         source_ids=[source.id],  # Attach the source with files

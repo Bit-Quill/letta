@@ -43,7 +43,39 @@ from letta.server.server import SyncServer
 from letta.services.block_manager import BlockManager
 
 # Constants
-DEFAULT_EMBEDDING_CONFIG = EmbeddingConfig.default_config(provider="openai")
+# Allow overriding embedding config via environment variables for local testing
+_embedding_endpoint = os.getenv("LETTA_TEST_EMBEDDING_ENDPOINT")
+_embedding_model = os.getenv("LETTA_TEST_EMBEDDING_MODEL")
+
+if _embedding_endpoint and _embedding_model:
+    # Use custom embedding config from environment
+    DEFAULT_EMBEDDING_CONFIG = EmbeddingConfig(
+        embedding_endpoint_type="openai",
+        embedding_endpoint=_embedding_endpoint,
+        embedding_model=_embedding_model,
+        embedding_dim=int(os.getenv("LETTA_TEST_EMBEDDING_DIM", "768")),
+        embedding_chunk_size=int(os.getenv("LETTA_TEST_EMBEDDING_CHUNK_SIZE", "300")),
+    )
+else:
+    # Default to OpenAI for standard test runs
+    DEFAULT_EMBEDDING_CONFIG = DEFAULT_EMBEDDING_CONFIG
+
+# Allow overriding LLM config via environment variables for local testing
+_llm_endpoint = os.getenv("LETTA_TEST_LLM_ENDPOINT")
+_llm_model = os.getenv("LETTA_TEST_LLM_MODEL")
+
+if _llm_endpoint and _llm_model:
+    # Use custom LLM config from environment
+    DEFAULT_LLM_CONFIG = LLMConfig(
+        model=_llm_model,
+        model_endpoint_type="openai",
+        model_endpoint=_llm_endpoint,
+        context_window=int(os.getenv("LETTA_TEST_LLM_CONTEXT_WINDOW", "8192")),
+    )
+else:
+    # Default to OpenAI for standard test runs
+    DEFAULT_LLM_CONFIG = DEFAULT_LLM_CONFIG
+
 CREATE_DELAY_SQLITE = 1
 USING_SQLITE = not bool(os.getenv("LETTA_PG_URI"))
 
@@ -78,6 +110,22 @@ async def _clear_tables(async_session):
     # Re-enable foreign key constraints for SQLite only
     if engine_name == "sqlite":
         await async_session.execute(text("PRAGMA foreign_keys = ON"))
+
+
+@pytest.fixture(scope="function", autouse=True)
+async def _cleanup_cache_client():
+    """Cleanup cache client after each test to prevent hanging."""
+    yield
+    # Close the singleton cache client
+    from letta.data_sources.cache_backend import _client_instance
+    if _client_instance is not None:
+        try:
+            await _client_instance.close()
+        except Exception:
+            pass
+        # Reset the singleton
+        import letta.data_sources.cache_backend as cache_backend_module
+        cache_backend_module._client_instance = None
 
 
 @pytest.fixture(scope="module")
@@ -334,8 +382,8 @@ async def sarah_agent(server: SyncServer, default_user, default_organization):
             name="sarah_agent",
             agent_type="memgpt_v2_agent",
             memory_blocks=[],
-            llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            llm_config=DEFAULT_LLM_CONFIG,
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -351,8 +399,8 @@ async def charles_agent(server: SyncServer, default_user, default_organization):
             name="charles_agent",
             agent_type="memgpt_v2_agent",
             memory_blocks=[CreateBlock(label="human", value="Charles"), CreateBlock(label="persona", value="I am a helpful assistant")],
-            llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            llm_config=DEFAULT_LLM_CONFIG,
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             include_base_tools=False,
         ),
         actor=default_user,
@@ -368,8 +416,8 @@ async def comprehensive_test_agent_fixture(server: SyncServer, default_user, pri
         agent_type="memgpt_v2_agent",
         system="test system",
         memory_blocks=memory_blocks,
-        llm_config=LLMConfig.default_config("gpt-4o-mini"),
-        embedding_config=EmbeddingConfig.default_config(provider="openai"),
+        llm_config=DEFAULT_LLM_CONFIG,
+        embedding_config=DEFAULT_EMBEDDING_CONFIG,
         block_ids=[default_block.id],
         tool_ids=[print_tool.id],
         source_ids=[default_source.id],
@@ -399,7 +447,7 @@ async def comprehensive_test_agent_fixture(server: SyncServer, default_user, pri
 async def default_archive(server: SyncServer, default_user):
     """Create and return a default archive."""
     archive = await server.archive_manager.create_archive_async(
-        "test", embedding_config=EmbeddingConfig.default_config(provider="openai"), actor=default_user
+        "test", embedding_config=DEFAULT_EMBEDDING_CONFIG, actor=default_user
     )
     yield archive
 
@@ -688,8 +736,8 @@ async def agent_with_tags(server: SyncServer, default_user):
             name="agent1",
             agent_type="memgpt_v2_agent",
             tags=["primary_agent", "benefit_1"],
-            llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            llm_config=DEFAULT_LLM_CONFIG,
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -701,8 +749,8 @@ async def agent_with_tags(server: SyncServer, default_user):
             name="agent2",
             agent_type="memgpt_v2_agent",
             tags=["primary_agent", "benefit_2"],
-            llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            llm_config=DEFAULT_LLM_CONFIG,
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -714,8 +762,8 @@ async def agent_with_tags(server: SyncServer, default_user):
             name="agent3",
             agent_type="memgpt_v2_agent",
             tags=["primary_agent", "benefit_1", "benefit_2"],
-            llm_config=LLMConfig.default_config("gpt-4o-mini"),
-            embedding_config=EmbeddingConfig.default_config(provider="openai"),
+            llm_config=DEFAULT_LLM_CONFIG,
+            embedding_config=DEFAULT_EMBEDDING_CONFIG,
             memory_blocks=[],
             include_base_tools=False,
         ),
@@ -733,7 +781,7 @@ async def agent_with_tags(server: SyncServer, default_user):
 @pytest.fixture
 def dummy_llm_config() -> LLMConfig:
     """Create a dummy LLM config."""
-    return LLMConfig.default_config("gpt-4o-mini")
+    return DEFAULT_LLM_CONFIG
 
 
 @pytest.fixture
