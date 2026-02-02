@@ -222,8 +222,8 @@ class ValkeyBackend(CacheBackend):
           return []
       result = []
       for k, v in mapping.items():
-          fields = v[0]  # [b'index', b'2']
-          fields_dict = {fields[i].decode(): fields[i+1].decode() for i in range(0, len(fields), 2)}
+          # v is a list of field-value pairs: [[b'field1', b'value1'], [b'field2', b'value2']]
+          fields_dict = {pair[0].decode(): pair[1].decode() for pair in v}
           result.append((k.decode(), fields_dict))
       return result
 
