@@ -158,8 +158,8 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
 
                 logger.debug(f"Flushed {len(chunks)} chunks to Valkey stream {stream_key}, seq_ids {chunks[0]['seq_id']}-{chunks[-1]['seq_id']}")
 
-                if chunks[-1].get("complete") == "true":
-                    self._cleanup_run(run_id)
+                # Note: Don't cleanup here even if complete=true, as mark_complete() may still need
+                # to write additional chunks. Cleanup happens in stop() or mark_complete() instead.
 
             except Exception as e:
                 logger.error(f"Failed to flush chunks for run {run_id}: {e}")
@@ -200,6 +200,8 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
         """Mark a stream as complete and flush."""
         # Add a [DONE] marker
         await self.write_chunk(run_id, "data: [DONE]\n\n", is_complete=True)
+        # Cleanup after writing the final marker
+        self._cleanup_run(run_id)
 
 
 async def create_background_stream_processor(
