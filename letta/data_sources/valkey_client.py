@@ -183,7 +183,8 @@ class ValkeyBackend(CacheBackend):
         self, stream: str, fields: Dict[str, Any], id: str = "*", maxlen: Optional[int] = None, approximate: bool = True
     ) -> str:
         client = await self.get_client()
-        field_items = list(fields.items())
+        # Glide requires all values to be bytes or str, convert ints to strings
+        field_items = [(k, str(v) if isinstance(v, (int, float)) else v) for k, v in fields.items()]
         trim_options = TrimByMaxLen(exact=not approximate, threshold=maxlen) if maxlen is not None else None
 
         # glide-py xadd has a slightly different signature
