@@ -14,6 +14,9 @@ from letta.settings import model_settings
 
 logger = get_logger(__name__)
 
+# MiniMax API base URL
+MINIMAX_BASE_URL = "https://api.minimax.chat/v1"
+
 
 class MiniMaxClient(AnthropicClient):
     """

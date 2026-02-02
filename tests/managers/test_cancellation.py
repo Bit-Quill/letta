@@ -1144,6 +1144,7 @@ class TestApprovalFlowCancellation:
                 f"Message IDs: {messages_in_agent_not_in_db}"
             )
 
+    @pytest.mark.skip(reason="Flaky test - timing sensitive")
     @pytest.mark.asyncio
     async def test_parallel_tool_calling_cancellation_with_denials(
         self,

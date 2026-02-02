@@ -53,7 +53,7 @@ class LettaRequest(BaseModel):
         default=None, description="Only return specified message types in the response. If `None` (default) returns all messages."
     )
 
-    enable_thinking: str = Field(
+    enable_thinking: bool = Field(
         default=True,
         description="If set to True, enables reasoning before responses or tool calls from the agent.",
         deprecated=True,

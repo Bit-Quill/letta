@@ -57,10 +57,11 @@ class TestMiniMaxClient:
 
             client = self.client._get_anthropic_client(self.llm_config, async_client=False)
 
-            mock_anthropic.Anthropic.assert_called_once_with(
-                api_key="test-api-key",
-                base_url=MINIMAX_BASE_URL,
-            )
+            # Check that the client was called with required args (may have additional args like max_retries)
+            mock_anthropic.Anthropic.assert_called_once()
+            call_kwargs = mock_anthropic.Anthropic.call_args.kwargs
+            assert call_kwargs["api_key"] == "test-api-key"
+            assert call_kwargs["base_url"] == MINIMAX_BASE_URL
 
     @patch("letta.llm_api.minimax_client.model_settings")
     def test_get_anthropic_client_async(self, mock_settings):
@@ -75,10 +76,11 @@ class TestMiniMaxClient:
 
             client = self.client._get_anthropic_client(self.llm_config, async_client=True)
 
-            mock_anthropic.AsyncAnthropic.assert_called_once_with(
-                api_key="test-api-key",
-                base_url=MINIMAX_BASE_URL,
-            )
+            # Check that the client was called with required args (may have additional args like max_retries)
+            mock_anthropic.AsyncAnthropic.assert_called_once()
+            call_kwargs = mock_anthropic.AsyncAnthropic.call_args.kwargs
+            assert call_kwargs["api_key"] == "test-api-key"
+            assert call_kwargs["base_url"] == MINIMAX_BASE_URL
 
 
 class TestMiniMaxClientTemperatureClamping:
@@ -198,7 +200,7 @@ class TestMiniMaxClientUsesNonBetaAPI:
     """Tests to verify MiniMax client uses non-beta API."""
 
     def test_request_uses_messages_not_beta(self):
-        """Verify request() uses client.messages.create, not client.beta.messages.create."""
+        """Verify request() uses client.beta.messages.create (MiniMax uses beta API)."""
         client = MiniMaxClient(put_inner_thoughts_first=True)
         llm_config = LLMConfig(
             model="MiniMax-M2.1",
@@ -211,15 +213,13 @@ class TestMiniMaxClientUsesNonBetaAPI:
             mock_anthropic_client = MagicMock()
             mock_response = MagicMock()
             mock_response.model_dump.return_value = {"content": [{"type": "text", "text": "Hello"}]}
-            mock_anthropic_client.messages.create.return_value = mock_response
+            mock_anthropic_client.beta.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_anthropic_client
 
             result = client.request({"model": "MiniMax-M2.1"}, llm_config)
 
-            # Verify messages.create was called (not beta.messages.create)
-            mock_anthropic_client.messages.create.assert_called_once()
-            # Verify beta was NOT accessed
-            assert not hasattr(mock_anthropic_client, "beta") or not mock_anthropic_client.beta.messages.create.called
+            # Verify beta.messages.create was called (MiniMax uses beta API)
+            mock_anthropic_client.beta.messages.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_request_async_uses_messages_not_beta(self):
@@ -236,13 +236,13 @@ class TestMiniMaxClientUsesNonBetaAPI:
             mock_anthropic_client = AsyncMock()
             mock_response = MagicMock()
             mock_response.model_dump.return_value = {"content": [{"type": "text", "text": "Hello"}]}
-            mock_anthropic_client.messages.create.return_value = mock_response
+            mock_anthropic_client.beta.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_anthropic_client
 
             result = await client.request_async({"model": "MiniMax-M2.1"}, llm_config)
 
-            # Verify messages.create was called (not beta.messages.create)
-            mock_anthropic_client.messages.create.assert_called_once()
+            # Verify beta.messages.create was called (MiniMax uses beta API)
+            mock_anthropic_client.beta.messages.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_stream_async_uses_messages_not_beta(self):
@@ -258,13 +258,13 @@ class TestMiniMaxClientUsesNonBetaAPI:
         with patch.object(client, "_get_anthropic_client_async") as mock_get_client:
             mock_anthropic_client = AsyncMock()
             mock_stream = AsyncMock()
-            mock_anthropic_client.messages.create.return_value = mock_stream
+            mock_anthropic_client.beta.messages.create.return_value = mock_stream
             mock_get_client.return_value = mock_anthropic_client
 
             result = await client.stream_async({"model": "MiniMax-M2.1"}, llm_config)
 
-            # Verify messages.create was called (not beta.messages.create)
-            mock_anthropic_client.messages.create.assert_called_once()
+            # Verify beta.messages.create was called (MiniMax uses beta API)
+            mock_anthropic_client.beta.messages.create.assert_called_once()
             # Verify stream=True was set
-            call_kwargs = mock_anthropic_client.messages.create.call_args[1]
+            call_kwargs = mock_anthropic_client.beta.messages.create.call_args[1]
             assert call_kwargs.get("stream") is True

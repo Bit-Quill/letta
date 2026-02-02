@@ -16,7 +16,7 @@ class TestLettaRequest:
         messages = [MessageCreate(role="user", content="Test message")]
         request = LettaRequest(messages=messages)
 
-        assert request.max_steps == 10
+        assert request.max_steps == 50
         assert request.messages == messages
         assert request.use_assistant_message is True
         assert request.assistant_message_tool_name == DEFAULT_MESSAGE_TOOL
@@ -108,10 +108,11 @@ class TestLettaBatchRequest:
     def test_letta_batch_request_inherits_max_steps(self):
         """Test that LettaBatchRequest inherits max_steps from LettaRequest"""
         messages = [MessageCreate(role="user", content="Test message")]
-        request = LettaBatchRequest(messages=messages, agent_id="test-agent-id", max_steps=20)
+        agent_id = "agent-00000000-0000-4000-8000-000000000000"
+        request = LettaBatchRequest(messages=messages, agent_id=agent_id, max_steps=20)
 
         assert request.max_steps == 20
-        assert request.agent_id == "test-agent-id"
+        assert request.agent_id == agent_id
 
     def test_letta_batch_request_required_agent_id(self):
         """Test that agent_id is required for LettaBatchRequest"""
@@ -130,8 +131,8 @@ class TestCreateBatch:
         """Test CreateBatch containing requests with max_steps"""
         messages = [MessageCreate(role="user", content="Test message")]
         batch_requests = [
-            LettaBatchRequest(messages=messages, agent_id="agent-1", max_steps=5),
-            LettaBatchRequest(messages=messages, agent_id="agent-2", max_steps=10),
+            LettaBatchRequest(messages=messages, agent_id="agent-00000000-0000-4000-8000-000000000001", max_steps=5),
+            LettaBatchRequest(messages=messages, agent_id="agent-00000000-0000-4000-8000-000000000002", max_steps=10),
         ]
 
         batch = CreateBatch(requests=batch_requests)
@@ -143,7 +144,7 @@ class TestCreateBatch:
     def test_create_batch_with_callback_url(self):
         """Test CreateBatch with callback URL"""
         messages = [MessageCreate(role="user", content="Test message")]
-        batch_requests = [LettaBatchRequest(messages=messages, agent_id="agent-1", max_steps=3)]
+        batch_requests = [LettaBatchRequest(messages=messages, agent_id="agent-00000000-0000-4000-8000-000000000001", max_steps=3)]
 
         batch = CreateBatch(requests=batch_requests, callback_url="https://example.com/callback")
 
@@ -167,7 +168,7 @@ class TestLettaRequestIntegration:
         assert streaming_request.max_steps == 6
 
         # Test LettaBatchRequest inheritance
-        batch_request = LettaBatchRequest(messages=messages, agent_id="test-agent", max_steps=9)
+        batch_request = LettaBatchRequest(messages=messages, agent_id="agent-00000000-0000-4000-8000-000000000001", max_steps=9)
         assert batch_request.max_steps == 9
 
     def test_backwards_compatibility(self):
@@ -176,8 +177,8 @@ class TestLettaRequestIntegration:
 
         # Should work without max_steps (uses default)
         request = LettaRequest(messages=messages)
-        assert request.max_steps == 10
+        assert request.max_steps == 50
 
         # Should work with all other fields
         request = LettaRequest(messages=messages, use_assistant_message=False, assistant_message_tool_name="custom_tool")
-        assert request.max_steps == 10  # Still uses default
+        assert request.max_steps == 50  # Still uses default

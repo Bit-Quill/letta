@@ -137,7 +137,7 @@ async def _clear_tables(async_session):
 @pytest.fixture
 async def default_organization(server: SyncServer):
     """Fixture to create and return the default organization."""
-    org = server.organization_manager.create_default_organization()
+    org = await server.organization_manager.create_default_organization_async()
     yield org
 
 
@@ -149,9 +149,9 @@ async def other_organization(server: SyncServer):
 
 
 @pytest.fixture
-def default_user(server: SyncServer, default_organization):
+async def default_user(server: SyncServer, default_organization):
     """Fixture to create and return the default user within the default organization."""
-    user = server.user_manager.create_default_user(org_id=default_organization.id)
+    user = await server.user_manager.create_default_actor_async(org_id=default_organization.id)
     yield user
 
 
@@ -330,14 +330,14 @@ async def default_run(server: SyncServer, default_user):
 
 
 @pytest.fixture
-def agent_passage_fixture(server: SyncServer, default_user, sarah_agent):
+async def agent_passage_fixture(server: SyncServer, default_user, sarah_agent):
     """Fixture to create an agent passage."""
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
-    passage = server.passage_manager.create_agent_passage(
+    passage = await server.passage_manager.create_agent_passage_async(
         PydanticPassage(
             text="Hello, I am an agent passage",
             archive_id=archive.id,
@@ -352,9 +352,9 @@ def agent_passage_fixture(server: SyncServer, default_user, sarah_agent):
 
 
 @pytest.fixture
-def source_passage_fixture(server: SyncServer, default_user, default_file, default_source):
+async def source_passage_fixture(server: SyncServer, default_user, default_file, default_source):
     """Fixture to create a source passage."""
-    passage = server.passage_manager.create_source_passage(
+    passage = await server.passage_manager.create_source_passage_async(
         PydanticPassage(
             text="Hello, I am a source passage",
             source_id=default_source.id,
@@ -371,17 +371,17 @@ def source_passage_fixture(server: SyncServer, default_user, default_file, defau
 
 
 @pytest.fixture
-def create_test_passages(server: SyncServer, default_file, default_user, sarah_agent, default_source):
+async def create_test_passages(server: SyncServer, default_file, default_user, sarah_agent, default_source):
     """Helper function to create test passages for all tests."""
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create agent passages
     passages = []
     for i in range(5):
-        passage = server.passage_manager.create_agent_passage(
+        passage = await server.passage_manager.create_agent_passage_async(
             PydanticPassage(
                 text=f"Agent passage {i}",
                 archive_id=archive.id,
@@ -398,7 +398,7 @@ def create_test_passages(server: SyncServer, default_file, default_user, sarah_a
 
     # Create source passages
     for i in range(5):
-        passage = server.passage_manager.create_source_passage(
+        passage = await server.passage_manager.create_source_passage_async(
             PydanticPassage(
                 text=f"Source passage {i}",
                 source_id=default_source.id,
@@ -455,7 +455,8 @@ def sandbox_env_var_fixture(server: SyncServer, sandbox_config_fixture, default_
 
 
 @pytest.fixture
-def default_block(server: SyncServer, default_user):
+@pytest.fixture
+async def default_block(server: SyncServer, default_user):
     """Fixture to create and return a default block."""
     block_manager = BlockManager()
     block_data = PydanticBlock(
@@ -465,12 +466,13 @@ def default_block(server: SyncServer, default_user):
         limit=1000,
         metadata={"type": "test"},
     )
-    block = block_manager.create_or_update_block(block_data, actor=default_user)
+    block = await block_manager.create_or_update_block_async(block_data, actor=default_user)
     yield block
 
 
 @pytest.fixture
-def other_block(server: SyncServer, default_user):
+@pytest.fixture
+async def other_block(server: SyncServer, default_user):
     """Fixture to create and return another block."""
     block_manager = BlockManager()
     block_data = PydanticBlock(
@@ -480,7 +482,7 @@ def other_block(server: SyncServer, default_user):
         limit=500,
         metadata={"type": "test"},
     )
-    block = block_manager.create_or_update_block(block_data, actor=default_user)
+    block = await block_manager.create_or_update_block_async(block_data, actor=default_user)
     yield block
 
 
@@ -2721,7 +2723,7 @@ def test_get_block_with_label(server: SyncServer, sarah_agent, default_block, de
 
 @pytest.mark.asyncio
 async def test_refresh_memory_async(server: SyncServer, default_user):
-    block = server.block_manager.create_or_update_block(
+    block = server.await block_manager.create_or_update_block_async(
         PydanticBlock(
             label="test",
             value="test",
@@ -2729,7 +2731,7 @@ async def test_refresh_memory_async(server: SyncServer, default_user):
         ),
         actor=default_user,
     )
-    block_human = server.block_manager.create_or_update_block(
+    block_human = server.await block_manager.create_or_update_block_async(
         PydanticBlock(
             label="human",
             value="name: caren",
@@ -2905,7 +2907,7 @@ async def test_agent_list_passages_vector_search(
 
     # Get or create default archive for the agent
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create passages with known embeddings
@@ -3061,13 +3063,14 @@ async def test_list_organizations_pagination(server: SyncServer):
 # ======================================================================================================================
 
 
-def test_passage_create_agentic(server: SyncServer, agent_passage_fixture, default_user):
+@pytest.mark.asyncio
+async def test_passage_create_agentic(server: SyncServer, agent_passage_fixture, default_user):
     """Test creating a passage using agent_passage_fixture fixture"""
     assert agent_passage_fixture.id is not None
     assert agent_passage_fixture.text == "Hello, I am an agent passage"
 
     # Verify we can retrieve it
-    retrieved = server.passage_manager.get_passage_by_id(
+    retrieved = await server.passage_manager.get_passage_by_id_async(
         agent_passage_fixture.id,
         actor=default_user,
     )
@@ -3076,13 +3079,14 @@ def test_passage_create_agentic(server: SyncServer, agent_passage_fixture, defau
     assert retrieved.text == agent_passage_fixture.text
 
 
-def test_passage_create_source(server: SyncServer, source_passage_fixture, default_user):
+@pytest.mark.asyncio
+async def test_passage_create_source(server: SyncServer, source_passage_fixture, default_user):
     """Test creating a source passage."""
     assert source_passage_fixture is not None
     assert source_passage_fixture.text == "Hello, I am a source passage"
 
     # Verify we can retrieve it
-    retrieved = server.passage_manager.get_passage_by_id(
+    retrieved = await server.passage_manager.get_passage_by_id_async(
         source_passage_fixture.id,
         actor=default_user,
     )
@@ -3112,14 +3116,15 @@ async def test_passage_create_invalid(server: SyncServer, agent_passage_fixture,
         )
 
 
-def test_passage_get_by_id(server: SyncServer, agent_passage_fixture, source_passage_fixture, default_user):
+@pytest.mark.asyncio
+async def test_passage_get_by_id(server: SyncServer, agent_passage_fixture, source_passage_fixture, default_user):
     """Test retrieving a passage by ID"""
-    retrieved = server.passage_manager.get_passage_by_id(agent_passage_fixture.id, actor=default_user)
+    retrieved = await server.passage_manager.get_passage_by_id_async(agent_passage_fixture.id, actor=default_user)
     assert retrieved is not None
     assert retrieved.id == agent_passage_fixture.id
     assert retrieved.text == agent_passage_fixture.text
 
-    retrieved = server.passage_manager.get_passage_by_id(source_passage_fixture.id, actor=default_user)
+    retrieved = await server.passage_manager.get_passage_by_id_async(source_passage_fixture.id, actor=default_user)
     assert retrieved is not None
     assert retrieved.id == source_passage_fixture.id
     assert retrieved.text == source_passage_fixture.text
@@ -3130,8 +3135,8 @@ async def test_passage_cascade_deletion(
 ):
     """Test that passages are deleted when their parent (agent or source) is deleted."""
     # Verify passages exist
-    agent_passage = server.passage_manager.get_passage_by_id(agent_passage_fixture.id, default_user)
-    source_passage = server.passage_manager.get_passage_by_id(source_passage_fixture.id, default_user)
+    agent_passage = await server.passage_manager.get_passage_by_id_async(agent_passage_fixture.id, default_user)
+    source_passage = await server.passage_manager.get_passage_by_id_async(source_passage_fixture.id, default_user)
     assert agent_passage is not None
     assert source_passage is not None
 
@@ -3141,14 +3146,15 @@ async def test_passage_cascade_deletion(
     assert len(agentic_passages) == 0
 
 
-def test_create_agent_passage_specific(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_create_agent_passage_specific(server: SyncServer, default_user, sarah_agent):
     """Test creating an agent passage using the new agent-specific method."""
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
-    passage = server.passage_manager.create_agent_passage(
+    passage = await server.passage_manager.create_agent_passage_async(
         PydanticPassage(
             text="Test agent passage via specific method",
             archive_id=archive.id,
@@ -3168,9 +3174,10 @@ def test_create_agent_passage_specific(server: SyncServer, default_user, sarah_a
     assert sorted(passage.tags) == sorted(["python", "test", "agent"])
 
 
-def test_create_source_passage_specific(server: SyncServer, default_user, default_file, default_source):
+@pytest.mark.asyncio
+async def test_create_source_passage_specific(server: SyncServer, default_user, default_file, default_source):
     """Test creating a source passage using the new source-specific method."""
-    passage = server.passage_manager.create_source_passage(
+    passage = await server.passage_manager.create_source_passage_async(
         PydanticPassage(
             text="Test source passage via specific method",
             source_id=default_source.id,
@@ -3192,11 +3199,12 @@ def test_create_source_passage_specific(server: SyncServer, default_user, defaul
     assert sorted(passage.tags) == sorted(["document", "test", "source"])
 
 
-def test_create_agent_passage_validation(server: SyncServer, default_user, default_source, sarah_agent):
+@pytest.mark.asyncio
+async def test_create_agent_passage_validation(server: SyncServer, default_user, default_source, sarah_agent):
     """Test that agent passage creation validates inputs correctly."""
     # Should fail if archive_id is missing
     with pytest.raises(ValueError, match="Agent passage must have archive_id"):
-        server.passage_manager.create_agent_passage(
+        await server.passage_manager.create_agent_passage_async(
             PydanticPassage(
                 text="Invalid agent passage",
                 organization_id=default_user.organization_id,
@@ -3207,13 +3215,13 @@ def test_create_agent_passage_validation(server: SyncServer, default_user, defau
         )
 
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Should fail if source_id is present
     with pytest.raises(ValueError, match="Agent passage cannot have source_id"):
-        server.passage_manager.create_agent_passage(
+        await server.passage_manager.create_agent_passage_async(
             PydanticPassage(
                 text="Invalid agent passage",
                 archive_id=archive.id,
@@ -3226,11 +3234,12 @@ def test_create_agent_passage_validation(server: SyncServer, default_user, defau
         )
 
 
-def test_create_source_passage_validation(server: SyncServer, default_user, default_file, default_source, sarah_agent):
+@pytest.mark.asyncio
+async def test_create_source_passage_validation(server: SyncServer, default_user, default_file, default_source, sarah_agent):
     """Test that source passage creation validates inputs correctly."""
     # Should fail if source_id is missing
     with pytest.raises(ValueError, match="Source passage must have source_id"):
-        server.passage_manager.create_source_passage(
+        await server.passage_manager.create_source_passage_async(
             PydanticPassage(
                 text="Invalid source passage",
                 organization_id=default_user.organization_id,
@@ -3242,13 +3251,13 @@ def test_create_source_passage_validation(server: SyncServer, default_user, defa
         )
 
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Should fail if archive_id is present
     with pytest.raises(ValueError, match="Source passage cannot have archive_id"):
-        server.passage_manager.create_source_passage(
+        await server.passage_manager.create_source_passage_async(
             PydanticPassage(
                 text="Invalid source passage",
                 source_id=default_source.id,
@@ -3262,15 +3271,16 @@ def test_create_source_passage_validation(server: SyncServer, default_user, defa
         )
 
 
-def test_get_agent_passage_by_id_specific(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_get_agent_passage_by_id_specific(server: SyncServer, default_user, sarah_agent):
     """Test retrieving an agent passage using the new agent-specific method."""
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create an agent passage
-    passage = server.passage_manager.create_agent_passage(
+    passage = await server.passage_manager.create_agent_passage_async(
         PydanticPassage(
             text="Agent passage for retrieval test",
             archive_id=archive.id,
@@ -3282,17 +3292,18 @@ def test_get_agent_passage_by_id_specific(server: SyncServer, default_user, sara
     )
 
     # Retrieve it using the specific method
-    retrieved = server.passage_manager.get_agent_passage_by_id(passage.id, actor=default_user)
+    retrieved = await server.passage_manager.get_agent_passage_by_id_async(passage.id, actor=default_user)
     assert retrieved is not None
     assert retrieved.id == passage.id
     assert retrieved.text == passage.text
     assert retrieved.archive_id == archive.id
 
 
-def test_get_source_passage_by_id_specific(server: SyncServer, default_user, default_file, default_source):
+@pytest.mark.asyncio
+async def test_get_source_passage_by_id_specific(server: SyncServer, default_user, default_file, default_source):
     """Test retrieving a source passage using the new source-specific method."""
     # Create a source passage
-    passage = server.passage_manager.create_source_passage(
+    passage = await server.passage_manager.create_source_passage_async(
         PydanticPassage(
             text="Source passage for retrieval test",
             source_id=default_source.id,
@@ -3306,22 +3317,23 @@ def test_get_source_passage_by_id_specific(server: SyncServer, default_user, def
     )
 
     # Retrieve it using the specific method
-    retrieved = server.passage_manager.get_source_passage_by_id(passage.id, actor=default_user)
+    retrieved = await server.passage_manager.get_source_passage_by_id_async(passage.id, actor=default_user)
     assert retrieved is not None
     assert retrieved.id == passage.id
     assert retrieved.text == passage.text
     assert retrieved.source_id == default_source.id
 
 
-def test_get_wrong_passage_type_fails(server: SyncServer, default_user, sarah_agent, default_file, default_source):
+@pytest.mark.asyncio
+async def test_get_wrong_passage_type_fails(server: SyncServer, default_user, sarah_agent, default_file, default_source):
     """Test that trying to get the wrong passage type with specific methods fails."""
     # Create an agent passage
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
-    agent_passage = server.passage_manager.create_agent_passage(
+    agent_passage = await server.passage_manager.create_agent_passage_async(
         PydanticPassage(
             text="Agent passage",
             archive_id=archive.id,
@@ -3333,7 +3345,7 @@ def test_get_wrong_passage_type_fails(server: SyncServer, default_user, sarah_ag
     )
 
     # Create a source passage
-    source_passage = server.passage_manager.create_source_passage(
+    source_passage = await server.passage_manager.create_source_passage_async(
         PydanticPassage(
             text="Source passage",
             source_id=default_source.id,
@@ -3348,22 +3360,23 @@ def test_get_wrong_passage_type_fails(server: SyncServer, default_user, sarah_ag
 
     # Trying to get agent passage with source method should fail
     with pytest.raises(NoResultFound):
-        server.passage_manager.get_source_passage_by_id(agent_passage.id, actor=default_user)
+        await server.passage_manager.get_source_passage_by_id_async(agent_passage.id, actor=default_user)
 
     # Trying to get source passage with agent method should fail
     with pytest.raises(NoResultFound):
-        server.passage_manager.get_agent_passage_by_id(source_passage.id, actor=default_user)
+        await server.passage_manager.get_agent_passage_by_id_async(source_passage.id, actor=default_user)
 
 
-def test_update_agent_passage_specific(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_update_agent_passage_specific(server: SyncServer, default_user, sarah_agent):
     """Test updating an agent passage using the new agent-specific method."""
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create an agent passage
-    passage = server.passage_manager.create_agent_passage(
+    passage = await server.passage_manager.create_agent_passage_async(
         PydanticPassage(
             text="Original agent passage text",
             archive_id=archive.id,
@@ -3392,10 +3405,11 @@ def test_update_agent_passage_specific(server: SyncServer, default_user, sarah_a
     assert updated_passage.id == passage.id
 
 
-def test_update_source_passage_specific(server: SyncServer, default_user, default_file, default_source):
+@pytest.mark.asyncio
+async def test_update_source_passage_specific(server: SyncServer, default_user, default_file, default_source):
     """Test updating a source passage using the new source-specific method."""
     # Create a source passage
-    passage = server.passage_manager.create_source_passage(
+    passage = await server.passage_manager.create_source_passage_async(
         PydanticPassage(
             text="Original source passage text",
             source_id=default_source.id,
@@ -3427,15 +3441,16 @@ def test_update_source_passage_specific(server: SyncServer, default_user, defaul
     assert updated_passage.id == passage.id
 
 
-def test_delete_agent_passage_specific(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_delete_agent_passage_specific(server: SyncServer, default_user, sarah_agent):
     """Test deleting an agent passage using the new agent-specific method."""
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create an agent passage
-    passage = server.passage_manager.create_agent_passage(
+    passage = await server.passage_manager.create_agent_passage_async(
         PydanticPassage(
             text="Agent passage to delete",
             archive_id=archive.id,
@@ -3447,7 +3462,7 @@ def test_delete_agent_passage_specific(server: SyncServer, default_user, sarah_a
     )
 
     # Verify it exists
-    retrieved = server.passage_manager.get_agent_passage_by_id(passage.id, actor=default_user)
+    retrieved = await server.passage_manager.get_agent_passage_by_id_async(passage.id, actor=default_user)
     assert retrieved is not None
 
     # Delete it
@@ -3456,13 +3471,14 @@ def test_delete_agent_passage_specific(server: SyncServer, default_user, sarah_a
 
     # Verify it's gone
     with pytest.raises(NoResultFound):
-        server.passage_manager.get_agent_passage_by_id(passage.id, actor=default_user)
+        await server.passage_manager.get_agent_passage_by_id_async(passage.id, actor=default_user)
 
 
-def test_delete_source_passage_specific(server: SyncServer, default_user, default_file, default_source):
+@pytest.mark.asyncio
+async def test_delete_source_passage_specific(server: SyncServer, default_user, default_file, default_source):
     """Test deleting a source passage using the new source-specific method."""
     # Create a source passage
-    passage = server.passage_manager.create_source_passage(
+    passage = await server.passage_manager.create_source_passage_async(
         PydanticPassage(
             text="Source passage to delete",
             source_id=default_source.id,
@@ -3476,7 +3492,7 @@ def test_delete_source_passage_specific(server: SyncServer, default_user, defaul
     )
 
     # Verify it exists
-    retrieved = server.passage_manager.get_source_passage_by_id(passage.id, actor=default_user)
+    retrieved = await server.passage_manager.get_source_passage_by_id_async(passage.id, actor=default_user)
     assert retrieved is not None
 
     # Delete it
@@ -3485,7 +3501,7 @@ def test_delete_source_passage_specific(server: SyncServer, default_user, defaul
 
     # Verify it's gone
     with pytest.raises(NoResultFound):
-        server.passage_manager.get_source_passage_by_id(passage.id, actor=default_user)
+        await server.passage_manager.get_source_passage_by_id_async(passage.id, actor=default_user)
 
 
 @pytest.mark.asyncio
@@ -3493,7 +3509,7 @@ async def test_create_many_agent_passages_async(server: SyncServer, default_user
     """Test creating multiple agent passages using the new batch method."""
     # Get or create default archive for the agent
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+        agent_state=sarah_agent, actor=default_user
     )
 
     passages = [
@@ -3545,18 +3561,19 @@ async def test_create_many_source_passages_async(server: SyncServer, default_use
         assert passage.archive_id is None
 
 
-def test_agent_passage_size(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_agent_passage_size(server: SyncServer, default_user, sarah_agent):
     """Test counting agent passages using the new agent-specific size method."""
     initial_size = server.passage_manager.agent_passage_size(actor=default_user, agent_id=sarah_agent.id)
 
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create some agent passages
     for i in range(3):
-        server.passage_manager.create_agent_passage(
+        await server.passage_manager.create_agent_passage_async(
             PydanticPassage(
                 text=f"Agent passage {i} for size test",
                 archive_id=archive.id,
@@ -3571,13 +3588,14 @@ def test_agent_passage_size(server: SyncServer, default_user, sarah_agent):
     assert final_size == initial_size + 3
 
 
-def test_deprecated_methods_show_warnings(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_deprecated_methods_show_warnings(server: SyncServer, default_user, sarah_agent):
     """Test that deprecated methods show deprecation warnings."""
     import warnings
 
     # Get or create default archive for the agent
-    archive = server.archive_manager.get_or_create_default_archive_for_agent(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+    archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
+        agent_state=sarah_agent, actor=default_user
     )
 
     with warnings.catch_warnings(record=True) as w:
@@ -3596,10 +3614,10 @@ def test_deprecated_methods_show_warnings(server: SyncServer, default_user, sara
         )
 
         # Test deprecated get_passage_by_id
-        server.passage_manager.get_passage_by_id(passage.id, actor=default_user)
+        await server.passage_manager.get_passage_by_id_async(passage.id, actor=default_user)
 
         # Test deprecated size
-        server.passage_manager.size(actor=default_user, agent_id=sarah_agent.id)
+        await server.passage_manager.size_async(actor=default_user, agent_id=sarah_agent.id)
 
         # Check that deprecation warnings were issued
         assert len(w) >= 3
@@ -3615,7 +3633,7 @@ async def test_passage_tags_functionality(disable_turbopuffer, server: SyncServe
 
     # Get or create default archive for the agent
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create passages with different tag combinations
@@ -3710,9 +3728,7 @@ async def test_comprehensive_tag_functionality(disable_turbopuffer, server: Sync
 
     # Test 2: Verify unique tags for archive
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id,
-        agent_name=sarah_agent.name,
-        actor=default_user,
+        agent_state=sarah_agent, actor=default_user,
     )
 
     unique_tags = await server.passage_manager.get_unique_tags_for_archive_async(
@@ -3935,9 +3951,7 @@ async def test_tag_edge_cases(disable_turbopuffer, server: SyncServer, sarah_age
 
     # Verify unique tags includes all special character tags
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id,
-        agent_name=sarah_agent.name,
-        actor=default_user,
+        agent_state=sarah_agent, actor=default_user,
     )
 
     unique_tags = await server.passage_manager.get_unique_tags_for_archive_async(
@@ -3981,7 +3995,7 @@ async def test_search_agent_archival_memory_async(disable_turbopuffer, server: S
     """Test the search_agent_archival_memory_async method that powers both the agent tool and API endpoint."""
     # Get or create default archive for the agent
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+        agent_state=sarah_agent, actor=default_user
     )
 
     # Create test passages with various content and tags
@@ -4236,7 +4250,7 @@ async def test_archive_manager_race_condition_handling(server: SyncServer, defau
     with patch.object(server.archive_manager, "create_archive_async", side_effect=track_create):
         with patch.object(server.archive_manager, "attach_agent_to_archive_async", side_effect=failing_attach):
             archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-                agent_id=agent.id, agent_name=agent.name, actor=default_user
+        agent_state=agent, actor=default_user
             )
 
     assert archive is not None
@@ -4260,7 +4274,7 @@ async def test_archive_manager_race_condition_handling(server: SyncServer, defau
 async def test_archive_manager_get_agent_from_passage_async(server: SyncServer, default_user, sarah_agent):
     """Test getting the agent ID that owns a passage through its archive."""
     archive = await server.archive_manager.get_or_create_default_archive_for_agent_async(
-        agent_id=sarah_agent.id, agent_name=sarah_agent.name, actor=default_user
+        agent_state=sarah_agent, actor=default_user
     )
 
     passage = await server.passage_manager.create_agent_passage_async(
@@ -4333,8 +4347,8 @@ async def test_create_default_user(server: SyncServer):
 @pytest.mark.asyncio
 async def test_update_user(server: SyncServer):
     # Create default organization
-    default_org = server.organization_manager.create_default_organization()
-    test_org = server.organization_manager.create_organization(PydanticOrganization(name="test_org"))
+    default_org = await server.organization_manager.create_default_organization_async()
+    test_org = await server.organization_manager.create_organization_async(PydanticOrganization(name="test_org"))
 
     user_name_a = "a"
     user_name_b = "b"
@@ -5851,7 +5865,8 @@ def test_message_listing_text_search(server: SyncServer, hello_world_message_fix
 # ======================================================================================================================
 
 
-def test_create_block(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_create_block(server: SyncServer, default_user):
     block_manager = BlockManager()
     block_create = PydanticBlock(
         label="human",
@@ -5864,7 +5879,7 @@ def test_create_block(server: SyncServer, default_user):
         metadata={"example": "data"},
     )
 
-    block = block_manager.create_or_update_block(block_create, actor=default_user)
+    block = await block_manager.create_or_update_block_async(block_create, actor=default_user)
 
     # Assertions to ensure the created block matches the expected values
     assert block.label == block_create.label
@@ -5946,8 +5961,8 @@ async def test_get_blocks(server, default_user):
     block_manager = BlockManager()
 
     # Create blocks to retrieve later
-    block_manager.create_or_update_block(PydanticBlock(label="human", value="Block 1"), actor=default_user)
-    block_manager.create_or_update_block(PydanticBlock(label="persona", value="Block 2"), actor=default_user)
+    await block_manager.create_or_update_block_async(PydanticBlock(label="human", value="Block 1"), actor=default_user)
+    await block_manager.create_or_update_block_async(PydanticBlock(label="persona", value="Block 2"), actor=default_user)
 
     # Retrieve blocks by different filters
     all_blocks = await block_manager.get_blocks_async(actor=default_user)
@@ -5977,7 +5992,7 @@ async def test_get_blocks_comprehensive(server, default_user, other_user_differe
     for _ in range(10):
         label = random_label("default")
         value = random_value()
-        block_manager.create_or_update_block(PydanticBlock(label=label, value=value), actor=default_user)
+        await block_manager.create_or_update_block_async(PydanticBlock(label=label, value=value), actor=default_user)
         default_user_blocks.append((label, value))
 
     # Create 3 blocks for other_user
@@ -5985,7 +6000,7 @@ async def test_get_blocks_comprehensive(server, default_user, other_user_differe
     for _ in range(3):
         label = random_label("other")
         value = random_value()
-        block_manager.create_or_update_block(PydanticBlock(label=label, value=value), actor=other_user_different_org)
+        await block_manager.create_or_update_block_async(PydanticBlock(label=label, value=value), actor=other_user_different_org)
         other_user_blocks.append((label, value))
 
     # Check default_user sees only their blocks
@@ -6018,9 +6033,10 @@ async def test_get_blocks_comprehensive(server, default_user, other_user_differe
         assert (await block_manager.get_blocks_async(actor=default_user, label=label)) == []
 
 
-def test_update_block(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_update_block(server: SyncServer, default_user):
     block_manager = BlockManager()
-    block = block_manager.create_or_update_block(PydanticBlock(label="persona", value="Original Content"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="persona", value="Original Content"), actor=default_user)
 
     # Update block's content
     update_data = BlockUpdate(value="Updated Content", description="Updated description")
@@ -6034,9 +6050,10 @@ def test_update_block(server: SyncServer, default_user):
     assert updated_block.description == "Updated description"
 
 
-def test_update_block_limit(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_update_block_limit(server: SyncServer, default_user):
     block_manager = BlockManager()
-    block = block_manager.create_or_update_block(PydanticBlock(label="persona", value="Original Content"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="persona", value="Original Content"), actor=default_user)
 
     limit = len("Updated Content") * 2000
     update_data = BlockUpdate(value="Updated Content" * 2000, description="Updated description")
@@ -6056,11 +6073,12 @@ def test_update_block_limit(server: SyncServer, default_user):
     assert updated_block.description == "Updated description"
 
 
-def test_update_block_limit_does_not_reset(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_update_block_limit_does_not_reset(server: SyncServer, default_user):
     block_manager = BlockManager()
     new_content = "Updated Content" * 2000
     limit = len(new_content)
-    block = block_manager.create_or_update_block(PydanticBlock(label="persona", value="Original Content", limit=limit), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="persona", value="Original Content", limit=limit), actor=default_user)
 
     # Ensure the update works
     update_data = BlockUpdate(value=new_content)
@@ -6076,7 +6094,7 @@ async def test_delete_block(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # Create and delete a block
-    block = block_manager.create_or_update_block(PydanticBlock(label="human", value="Sample content"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="human", value="Sample content"), actor=default_user)
     block_manager.delete_block(block_id=block.id, actor=default_user)
 
     # Verify that the block was deleted
@@ -6087,7 +6105,7 @@ async def test_delete_block(server: SyncServer, default_user):
 @pytest.mark.asyncio
 async def test_delete_block_detaches_from_agent(server: SyncServer, sarah_agent, default_user):
     # Create and delete a block
-    block = server.block_manager.create_or_update_block(PydanticBlock(label="human", value="Sample content"), actor=default_user)
+    block = server.await block_manager.create_or_update_block_async(PydanticBlock(label="human", value="Sample content"), actor=default_user)
     agent_state = server.agent_manager.attach_block(agent_id=sarah_agent.id, block_id=block.id, actor=default_user)
 
     # Check that block has been attached
@@ -6108,7 +6126,7 @@ async def test_delete_block_detaches_from_agent(server: SyncServer, sarah_agent,
 @pytest.mark.asyncio
 async def test_get_agents_for_block(server: SyncServer, sarah_agent, charles_agent, default_user):
     # Create and delete a block
-    block = server.block_manager.create_or_update_block(PydanticBlock(label="alien", value="Sample content"), actor=default_user)
+    block = server.await block_manager.create_or_update_block_async(PydanticBlock(label="alien", value="Sample content"), actor=default_user)
     sarah_agent = server.agent_manager.attach_block(agent_id=sarah_agent.id, block_id=block.id, actor=default_user)
     charles_agent = server.agent_manager.attach_block(agent_id=charles_agent.id, block_id=block.id, actor=default_user)
 
@@ -6246,7 +6264,8 @@ async def test_bulk_update_respects_org_scoping(
 # ======================================================================================================================
 
 
-def test_checkpoint_creates_history(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_checkpoint_creates_history(server: SyncServer, default_user):
     """
     Ensures that calling checkpoint_block creates a BlockHistory row and updates
     the block's current_history_entry_id appropriately.
@@ -6256,7 +6275,7 @@ def test_checkpoint_creates_history(server: SyncServer, default_user):
 
     # Create a block
     initial_value = "Initial block content"
-    created_block = block_manager.create_or_update_block(PydanticBlock(label="test_checkpoint", value=initial_value), actor=default_user)
+    created_block = await block_manager.create_or_update_block_async(PydanticBlock(label="test_checkpoint", value=initial_value), actor=default_user)
 
     # Act: checkpoint it
     block_manager.checkpoint_block(block_id=created_block.id, actor=default_user)
@@ -6277,11 +6296,12 @@ def test_checkpoint_creates_history(server: SyncServer, default_user):
         assert db_block.current_history_entry_id == hist.id
 
 
-def test_multiple_checkpoints(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_multiple_checkpoints(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # Create a block
-    block = block_manager.create_or_update_block(PydanticBlock(label="test_multi_checkpoint", value="v1"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="test_multi_checkpoint", value="v1"), actor=default_user)
 
     # 1) First checkpoint
     block_manager.checkpoint_block(block_id=block.id, actor=default_user)
@@ -6289,7 +6309,7 @@ def test_multiple_checkpoints(server: SyncServer, default_user):
     # 2) Update block content
     updated_block_data = PydanticBlock(**block.model_dump())
     updated_block_data.value = "v2"
-    block_manager.create_or_update_block(updated_block_data, actor=default_user)
+    await block_manager.create_or_update_block_async(updated_block_data, actor=default_user)
 
     # 3) Second checkpoint
     block_manager.checkpoint_block(block_id=block.id, actor=default_user)
@@ -6313,7 +6333,8 @@ def test_multiple_checkpoints(server: SyncServer, default_user):
         assert db_block.current_history_entry_id == history_entries[1].id
 
 
-def test_checkpoint_with_agent_id(server: SyncServer, default_user, sarah_agent):
+@pytest.mark.asyncio
+async def test_checkpoint_with_agent_id(server: SyncServer, default_user, sarah_agent):
     """
     Ensures that if we pass agent_id to checkpoint_block, we get
     actor_type=LETTA_AGENT, actor_id=<agent.id> in BlockHistory.
@@ -6321,7 +6342,7 @@ def test_checkpoint_with_agent_id(server: SyncServer, default_user, sarah_agent)
     block_manager = BlockManager()
 
     # Create a block
-    block = block_manager.create_or_update_block(PydanticBlock(label="test_agent_checkpoint", value="Agent content"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="test_agent_checkpoint", value="Agent content"), actor=default_user)
 
     # Checkpoint with agent_id
     block_manager.checkpoint_block(block_id=block.id, actor=default_user, agent_id=sarah_agent.id)
@@ -6333,7 +6354,8 @@ def test_checkpoint_with_agent_id(server: SyncServer, default_user, sarah_agent)
         assert hist_entry.actor_id == sarah_agent.id
 
 
-def test_checkpoint_with_no_state_change(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_checkpoint_with_no_state_change(server: SyncServer, default_user):
     """
     If we call checkpoint_block twice without any edits,
     we expect two entries or only one, depending on your policy.
@@ -6341,7 +6363,7 @@ def test_checkpoint_with_no_state_change(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # Create block
-    block = block_manager.create_or_update_block(PydanticBlock(label="test_no_change", value="original"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="test_no_change", value="original"), actor=default_user)
 
     # 1) checkpoint
     block_manager.checkpoint_block(block_id=block.id, actor=default_user)
@@ -6353,11 +6375,12 @@ def test_checkpoint_with_no_state_change(server: SyncServer, default_user):
         assert len(all_hist) == 2
 
 
-def test_checkpoint_concurrency_stale(server: SyncServer, default_user):
+@pytest.mark.asyncio
+async def test_checkpoint_concurrency_stale(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # create block
-    block = block_manager.create_or_update_block(PydanticBlock(label="test_stale_checkpoint", value="hello"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="test_stale_checkpoint", value="hello"), actor=default_user)
 
     # session1 loads
     with db_registry.session() as s1:
@@ -6397,13 +6420,13 @@ def test_checkpoint_no_future_states(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # 1) Create block with "v1" and checkpoint => seq=1
-    block_v1 = block_manager.create_or_update_block(PydanticBlock(label="no_future_test", value="v1"), actor=default_user)
+    block_v1 = await block_manager.create_or_update_block_async(PydanticBlock(label="no_future_test", value="v1"), actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # 2) Create "v2" and checkpoint => seq=2
     updated_data = PydanticBlock(**block_v1.model_dump())
     updated_data.value = "v2"
-    block_manager.create_or_update_block(updated_data, actor=default_user)
+    await block_manager.create_or_update_block_async(updated_data, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # So we have seq=1: v1, seq=2: v2. No "future" states.
@@ -6440,7 +6463,7 @@ def test_undo_checkpoint_block(server: SyncServer, default_user):
 
     # 1) Create block
     initial_value = "Version 1 content"
-    created_block = block_manager.create_or_update_block(PydanticBlock(label="undo_test", value=initial_value), actor=default_user)
+    created_block = await block_manager.create_or_update_block_async(PydanticBlock(label="undo_test", value=initial_value), actor=default_user)
 
     # 2) First checkpoint => seq=1
     block_manager.checkpoint_block(block_id=created_block.id, actor=default_user)
@@ -6448,7 +6471,7 @@ def test_undo_checkpoint_block(server: SyncServer, default_user):
     # 3) Update block content to "Version 2"
     updated_data = PydanticBlock(**created_block.model_dump())
     updated_data.value = "Version 2 content"
-    block_manager.create_or_update_block(updated_data, actor=default_user)
+    await block_manager.create_or_update_block_async(updated_data, actor=default_user)
 
     # 4) Second checkpoint => seq=2
     block_manager.checkpoint_block(block_id=created_block.id, actor=default_user)
@@ -6470,20 +6493,20 @@ def test_checkpoint_deletes_future_states_after_undo(server: SyncServer, default
 
     # 1) Create block
     block_init = PydanticBlock(label="test_truncation", value="v1")
-    block_v1 = block_manager.create_or_update_block(block_init, actor=default_user)
+    block_v1 = await block_manager.create_or_update_block_async(block_init, actor=default_user)
     # Checkpoint => seq=1
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # 2) Update to "v2", checkpoint => seq=2
     block_v2 = PydanticBlock(**block_v1.model_dump())
     block_v2.value = "v2"
-    block_manager.create_or_update_block(block_v2, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v2, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # 3) Update to "v3", checkpoint => seq=3
     block_v3 = PydanticBlock(**block_v1.model_dump())
     block_v3.value = "v3"
-    block_manager.create_or_update_block(block_v3, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v3, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # We now have three states in history: seq=1 (v1), seq=2 (v2), seq=3 (v3).
@@ -6502,7 +6525,7 @@ def test_checkpoint_deletes_future_states_after_undo(server: SyncServer, default
     # Let's do a new edit: "v1.5"
     block_v1_5 = PydanticBlock(**block_undo_2.model_dump())
     block_v1_5.value = "v1.5"
-    block_manager.create_or_update_block(block_v1_5, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v1_5, actor=default_user)
 
     # 5) Checkpoint => new seq=2, removing the old seq=2 and seq=3
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
@@ -6534,7 +6557,7 @@ def test_undo_no_history(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # Create a block but don't checkpoint it
-    block = block_manager.create_or_update_block(PydanticBlock(label="no_history_test", value="initial"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="no_history_test", value="initial"), actor=default_user)
 
     # Attempt to undo
     with pytest.raises(ValueError, match="has no history entry - cannot undo"):
@@ -6550,7 +6573,7 @@ def test_undo_first_checkpoint(server: SyncServer, default_user):
 
     # 1) Create the block
     block_data = PydanticBlock(label="first_checkpoint", value="Version1")
-    block = block_manager.create_or_update_block(block_data, actor=default_user)
+    block = await block_manager.create_or_update_block_async(block_data, actor=default_user)
 
     # 2) First checkpoint => seq=1
     block_manager.checkpoint_block(block_id=block.id, actor=default_user)
@@ -6569,20 +6592,20 @@ def test_undo_multiple_checkpoints(server: SyncServer, default_user):
 
     # Step 1: Create block
     block_data = PydanticBlock(label="multi_checkpoint", value="v1")
-    block_v1 = block_manager.create_or_update_block(block_data, actor=default_user)
+    block_v1 = await block_manager.create_or_update_block_async(block_data, actor=default_user)
     # checkpoint => seq=1
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # Step 2: Update to v2, checkpoint => seq=2
     block_data_v2 = PydanticBlock(**block_v1.model_dump())
     block_data_v2.value = "v2"
-    block_manager.create_or_update_block(block_data_v2, actor=default_user)
+    await block_manager.create_or_update_block_async(block_data_v2, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # Step 3: Update to v3, checkpoint => seq=3
     block_data_v3 = PydanticBlock(**block_v1.model_dump())
     block_data_v3.value = "v3"
-    block_manager.create_or_update_block(block_data_v3, actor=default_user)
+    await block_manager.create_or_update_block_async(block_data_v3, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # Now we have 3 seq: v1, v2, v3
@@ -6609,14 +6632,14 @@ def test_undo_concurrency_stale(server: SyncServer, default_user):
 
     # 1) create block
     block_data = PydanticBlock(label="concurrency_undo", value="v1")
-    block_v1 = block_manager.create_or_update_block(block_data, actor=default_user)
+    block_v1 = await block_manager.create_or_update_block_async(block_data, actor=default_user)
     # checkpoint => seq=1
     block_manager.checkpoint_block(block_v1.id, actor=default_user)
 
     # 2) update to v2
     block_data_v2 = PydanticBlock(**block_v1.model_dump())
     block_data_v2.value = "v2"
-    block_manager.create_or_update_block(block_data_v2, actor=default_user)
+    await block_manager.create_or_update_block_async(block_data_v2, actor=default_user)
     # checkpoint => seq=2
     block_manager.checkpoint_block(block_v1.id, actor=default_user)
 
@@ -6660,19 +6683,19 @@ def test_redo_checkpoint_block(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # 1) Create block, set value='v1'; checkpoint => seq=1
-    block_v1 = block_manager.create_or_update_block(PydanticBlock(label="redo_test", value="v1"), actor=default_user)
+    block_v1 = await block_manager.create_or_update_block_async(PydanticBlock(label="redo_test", value="v1"), actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # 2) Update to 'v2'; checkpoint => seq=2
     block_v2 = PydanticBlock(**block_v1.model_dump())
     block_v2.value = "v2"
-    block_manager.create_or_update_block(block_v2, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v2, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # 3) Update to 'v3'; checkpoint => seq=3
     block_v3 = PydanticBlock(**block_v1.model_dump())
     block_v3.value = "v3"
-    block_manager.create_or_update_block(block_v3, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v3, actor=default_user)
     block_manager.checkpoint_block(block_id=block_v1.id, actor=default_user)
 
     # Undo from seq=3 -> seq=2
@@ -6692,7 +6715,7 @@ def test_redo_no_history(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # Create block with no checkpoint
-    block = block_manager.create_or_update_block(PydanticBlock(label="redo_no_history", value="v0"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="redo_no_history", value="v0"), actor=default_user)
 
     # Attempt to redo => expect ValueError
     with pytest.raises(ValueError, match="no history entry - cannot redo"):
@@ -6707,13 +6730,13 @@ def test_redo_at_highest_checkpoint(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # 1) Create block => checkpoint => seq=1
-    b_init = block_manager.create_or_update_block(PydanticBlock(label="redo_highest", value="v1"), actor=default_user)
+    b_init = await block_manager.create_or_update_block_async(PydanticBlock(label="redo_highest", value="v1"), actor=default_user)
     block_manager.checkpoint_block(b_init.id, actor=default_user)
 
     # 2) Another edit => seq=2
     b_next = PydanticBlock(**b_init.model_dump())
     b_next.value = "v2"
-    block_manager.create_or_update_block(b_next, actor=default_user)
+    await block_manager.create_or_update_block_async(b_next, actor=default_user)
     block_manager.checkpoint_block(b_init.id, actor=default_user)
 
     # We are at seq=2, which is the highest checkpoint.
@@ -6731,25 +6754,25 @@ def test_redo_after_multiple_undo(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # Step 1: create initial block => seq=1
-    b_init = block_manager.create_or_update_block(PydanticBlock(label="redo_multi", value="v1"), actor=default_user)
+    b_init = await block_manager.create_or_update_block_async(PydanticBlock(label="redo_multi", value="v1"), actor=default_user)
     block_manager.checkpoint_block(b_init.id, actor=default_user)
 
     # seq=2
     b_v2 = PydanticBlock(**b_init.model_dump())
     b_v2.value = "v2"
-    block_manager.create_or_update_block(b_v2, actor=default_user)
+    await block_manager.create_or_update_block_async(b_v2, actor=default_user)
     block_manager.checkpoint_block(b_init.id, actor=default_user)
 
     # seq=3
     b_v3 = PydanticBlock(**b_init.model_dump())
     b_v3.value = "v3"
-    block_manager.create_or_update_block(b_v3, actor=default_user)
+    await block_manager.create_or_update_block_async(b_v3, actor=default_user)
     block_manager.checkpoint_block(b_init.id, actor=default_user)
 
     # seq=4
     b_v4 = PydanticBlock(**b_init.model_dump())
     b_v4.value = "v4"
-    block_manager.create_or_update_block(b_v4, actor=default_user)
+    await block_manager.create_or_update_block_async(b_v4, actor=default_user)
     block_manager.checkpoint_block(b_init.id, actor=default_user)
 
     # We have 4 checkpoints: v1...v4. Current is seq=4.
@@ -6769,19 +6792,19 @@ def test_redo_concurrency_stale(server: SyncServer, default_user):
     block_manager = BlockManager()
 
     # 1) Create block => checkpoint => seq=1
-    block = block_manager.create_or_update_block(PydanticBlock(label="redo_concurrency", value="v1"), actor=default_user)
+    block = await block_manager.create_or_update_block_async(PydanticBlock(label="redo_concurrency", value="v1"), actor=default_user)
     block_manager.checkpoint_block(block.id, actor=default_user)
 
     # 2) Another edit => checkpoint => seq=2
     block_v2 = PydanticBlock(**block.model_dump())
     block_v2.value = "v2"
-    block_manager.create_or_update_block(block_v2, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v2, actor=default_user)
     block_manager.checkpoint_block(block.id, actor=default_user)
 
     # 3) Another edit => checkpoint => seq=3
     block_v3 = PydanticBlock(**block.model_dump())
     block_v3.value = "v3"
-    block_manager.create_or_update_block(block_v3, actor=default_user)
+    await block_manager.create_or_update_block_async(block_v3, actor=default_user)
     block_manager.checkpoint_block(block.id, actor=default_user)
     # Now the block is at seq=3 in the DB
 
@@ -7055,8 +7078,8 @@ async def test_attach_detach_identity_from_block(server: SyncServer, default_blo
 @pytest.mark.asyncio
 async def test_get_set_blocks_for_identities(server: SyncServer, default_block, default_user):
     block_manager = BlockManager()
-    block_with_identity = block_manager.create_or_update_block(PydanticBlock(label="persona", value="Original Content"), actor=default_user)
-    block_without_identity = block_manager.create_or_update_block(PydanticBlock(label="user", value="Original Content"), actor=default_user)
+    block_with_identity = await block_manager.create_or_update_block_async(PydanticBlock(label="persona", value="Original Content"), actor=default_user)
+    block_without_identity = await block_manager.create_or_update_block_async(PydanticBlock(label="user", value="Original Content"), actor=default_user)
     identity = await server.identity_manager.create_identity_async(
         IdentityCreate(
             name="caren", identifier_key="1234", identity_type=IdentityType.user, block_ids=[default_block.id, block_with_identity.id]
@@ -10019,7 +10042,8 @@ async def test_record_timing_invalid_job(server: SyncServer, default_user):
     await server.job_manager.record_response_duration("nonexistent_job_id", 2_000_000_000, default_user)
 
 
-def test_list_tags(server: SyncServer, default_user, default_organization):
+@pytest.mark.asyncio
+async def test_list_tags(server: SyncServer, default_user, default_organization):
     """Test listing tags functionality."""
     # Create multiple agents with different tags
     agents = []
@@ -10061,8 +10085,8 @@ def test_list_tags(server: SyncServer, default_user, default_organization):
     assert no_match_tags == []  # Should return empty list
 
     # Test with different organization
-    other_org = server.organization_manager.create_organization(pydantic_org=PydanticOrganization(name="Other Org"))
-    other_user = server.user_manager.create_user(PydanticUser(name="Other User", organization_id=other_org.id))
+    other_org = await server.organization_manager.create_organization_async(pydantic_org=PydanticOrganization(name="Other Org"))
+    other_user = await server.user_manager.create_actor_async(PydanticUser(name="Other User", organization_id=other_org.id))
 
     # Other org's tags should be empty
     other_org_tags = server.agent_manager.list_tags(actor=other_user)
@@ -12671,7 +12695,7 @@ def test_create_internal_template_objects(server: SyncServer, default_user):
         deployment_id=deployment_id,
         entity_id=entity_id,
     )
-    block = server.block_manager.create_or_update_block(Block(**block_create.model_dump()), actor=default_user)
+    block = server.await block_manager.create_or_update_block_async(Block(**block_create.model_dump()), actor=default_user)
     # Verify block template fields
     assert block.base_template_id == base_template_id
     assert block.template_id == template_id

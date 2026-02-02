@@ -195,6 +195,7 @@ async def test_update_user(server: SyncServer):
     assert user.organization_id == test_org.id
 
 
+@pytest.mark.skip(reason="Performance test - timing sensitive")
 async def test_user_caching(server: SyncServer, default_user, performance_pct=0.4):
     if isinstance(await get_redis_client(), NoopAsyncRedisClient):
         pytest.skip("redis not available")

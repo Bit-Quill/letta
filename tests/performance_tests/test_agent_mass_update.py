@@ -165,10 +165,10 @@ def test_parallel_mass_update_agents_complex(client, roll_dice_tool, weather_too
     def do_update(agent_id: str):
         start = time.time()
         if random.random() < 0.5:
-            client.agents.modify(agent_id=agent_id, tool_ids=[rethink_tool.id])
+            client.agents.update(agent_id=agent_id, tool_ids=[rethink_tool.id])
         else:
             bid = random.choice(per_agent_blocks[agent_id])
-            client.agents.modify(agent_id=agent_id, block_ids=[bid])
+            client.agents.update(agent_id=agent_id, block_ids=[bid])
         return time.time() - start
 
     with ThreadPoolExecutor(max_workers=50) as executor:
