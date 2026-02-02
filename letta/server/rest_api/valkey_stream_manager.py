@@ -64,6 +64,8 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
         self.seq_counters: Dict[str, int] = defaultdict(lambda: 1)
         # Track last flush time per run
         self.last_flush: Dict[str, float] = defaultdict(float)
+        # Locks to prevent concurrent flushes per run
+        self._flush_locks: Dict[str, asyncio.Lock] = {}
 
         # Background flush task
         self._flush_task = None
@@ -131,34 +133,39 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
 
     async def _flush_run(self, run_id: str):
         """Flush buffered chunks for a specific run to Valkey."""
-        if not self.buffer[run_id]:
-            return
+        # Get or create lock for this run
+        if run_id not in self._flush_locks:
+            self._flush_locks[run_id] = asyncio.Lock()
+        
+        async with self._flush_locks[run_id]:
+            if not self.buffer[run_id]:
+                return
 
-        chunks = self.buffer[run_id]
-        self.buffer[run_id] = []
-        stream_key = f"sse:run:{run_id}"
+            chunks = self.buffer[run_id]
+            self.buffer[run_id] = []
+            stream_key = f"sse:run:{run_id}"
 
-        try:
-            # Write chunks to stream
-            for chunk in chunks:
-                await self.valkey.xadd(stream_key, chunk, maxlen=self.max_stream_length, approximate=True)
+            try:
+                # Write chunks to stream
+                for chunk in chunks:
+                    await self.valkey.xadd(stream_key, chunk, maxlen=self.max_stream_length, approximate=True)
 
-            # Set TTL on stream
-            client = await self.valkey.get_client()
-            await client.expire(stream_key, self.stream_ttl)
+                # Set TTL on stream
+                client = await self.valkey.get_client()
+                await client.expire(stream_key, self.stream_ttl)
 
-            self.last_flush[run_id] = time.time()
+                self.last_flush[run_id] = time.time()
 
-            logger.debug(f"Flushed {len(chunks)} chunks to Valkey stream {stream_key}, seq_ids {chunks[0]['seq_id']}-{chunks[-1]['seq_id']}")
+                logger.debug(f"Flushed {len(chunks)} chunks to Valkey stream {stream_key}, seq_ids {chunks[0]['seq_id']}-{chunks[-1]['seq_id']}")
 
-            if chunks[-1].get("complete") == "true":
-                self._cleanup_run(run_id)
+                if chunks[-1].get("complete") == "true":
+                    self._cleanup_run(run_id)
 
-        except Exception as e:
-            logger.error(f"Failed to flush chunks for run {run_id}: {e}")
-            # Put chunks back in buffer to retry
-            self.buffer[run_id] = chunks + self.buffer[run_id]
-            raise
+            except Exception as e:
+                logger.error(f"Failed to flush chunks for run {run_id}: {e}")
+                # Put chunks back in buffer to retry
+                self.buffer[run_id] = chunks + self.buffer[run_id]
+                raise
 
     async def _periodic_flush(self):
         """Background task to periodically flush buffers."""
@@ -187,6 +194,7 @@ class ValkeySSEStreamWriter(SSEStreamWriter):
         self.buffer.pop(run_id, None)
         self.seq_counters.pop(run_id, None)
         self.last_flush.pop(run_id, None)
+        self._flush_locks.pop(run_id, None)
 
     async def mark_complete(self, run_id: str):
         """Mark a stream as complete and flush."""
@@ -428,10 +436,15 @@ async def valkey_sse_stream_generator(
                     continue
 
                 chunk_seq_id = int(fields.get("seq_id", 0))
+                
+                # Always update cursor to track progress, even if we skip this chunk
                 if chunk_seq_id > cursor_seq_id:
+                    cursor_seq_id = chunk_seq_id
+                    
                     data = fields.get("data", "")
                     if not data:
                         logger.debug(f"No data found for chunk {chunk_seq_id} in run {run_id}")
+                        last_valkey_id = entry_id
                         continue
 
                     if '"run_id":null' in data:
